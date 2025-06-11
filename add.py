@@ -37,7 +37,8 @@ def add_images_to_collection(folder_path, explore = False):
             try:
                 image = np.array(Image.open(image_path))
                 collection.add(
-                    ids= [os.path.basename(image_path)],
+                    # ids= [os.path.basename(image_path)],
+                    ids= [image_path], # id is 
                     images= [image]
                 )
             except Exception as e:
