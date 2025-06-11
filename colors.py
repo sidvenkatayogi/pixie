@@ -1,6 +1,8 @@
 from PIL import Image
 import numpy as np
 import os
+import chromadb
+from chromadb import Documents, EmbeddingFunction, Embeddings
 
 def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
     # Resize image to speed up processing
@@ -70,6 +72,19 @@ def show(path):
     Image.fromarray(img_bar).show(title='Dominant colors')
     input()
 
-dir = "images/sidvenkatayogi"
-for p in os.listdir(dir):
-    show(os.path.join(dir, p))
+dir = "images"
+client = chromadb.PersistentClient()
+collection = chromadb.create_collection(name="colors")
+for f in os.listdir(dir):
+    if os.path.isdir(f):
+        for p in os.listdir(f):
+            show(os.path.join(dir, p))
+
+
+for file in files:
+    colors = get_dominant_colors(file)
+    fids = [file]*len(colors)
+    collection.add(
+        embeddings= colors,
+        ids = fids,
+    )
