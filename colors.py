@@ -18,13 +18,13 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
 
     i = 0
     while len(dominant_colors) < num_colors and i < len(color_counts):
-        if color_counts[i][0] > 0.3 * max: # if color is too insignificant, not dominant
+        if color_counts[i][0] > (0.1 * max): # if color is too insignificant, not dominant
             palette_index = color_counts[i][1]
 
             # palette is 1 x (3*num palette colors)
             rgb = palette[palette_index*3:palette_index*3+3]
             # only add colors if they are distinct from other dominant colors
-            if (i == 0 or all(dist(c1, rgb) > 150 for c1 in dominant_colors)):
+            if (i == 0 or all(dist(c1, rgb) > 100 for c1 in dominant_colors)):
                 palette_index = color_counts[i][1]
                 dominant_colors.append(palette[palette_index*3:palette_index*3+3])
         i += 1
@@ -69,6 +69,6 @@ def show(path):
     Image.fromarray(img_bar).show(title='Dominant colors')
     input()
 
-dir = "images/alariko"
+dir = "images/sidvenkatayogi"
 for p in os.listdir(dir):
     show(os.path.join(dir, p))
