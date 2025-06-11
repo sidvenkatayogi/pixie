@@ -5,6 +5,7 @@ import os
 def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
     # Resize image to speed up processing
     img = pil_img.resize((int(pil_img.width/100), int(pil_img.height/100)), resample= 0)
+    # img.show()
 
     # Reduce colors (uses k-means internally)
     paletted = img.convert('P', palette=Image.ADAPTIVE, colors= palette_size)
@@ -18,7 +19,7 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
 
     i = 0
     while len(dominant_colors) < num_colors and i < len(color_counts):
-        if color_counts[i][0] > (0.1 * max): # if color is too insignificant, not dominant
+        if color_counts[i][0] > (0.05 * max): # if color is too insignificant, not dominant
             palette_index = color_counts[i][1]
 
             # palette is 1 x (3*num palette colors)
