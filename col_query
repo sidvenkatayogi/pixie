@@ -1,0 +1,25 @@
+import colors as c
+import numpy as np
+import os
+from vectorDB import VectorDB
+
+def add(dir, db):
+    for f in os.listdir(dir):
+        if os.path.isdir(f):
+            add(os.path.join(dir, f), db)
+        else:
+            cols = c.get_dominant_colors(os.path.join(dir, f))
+            ids = [ f"{f} ({i})" for i, id in range(len(cols))]
+            # ids = [os.path.join(dir, f)]*len(cols) # ids cant be the same
+            db.add(
+                embeddings= cols,
+                ids = ids,
+            )
+
+dir = "images"
+db = VectorDB()
+# client = chromadb.PersistentClient()
+# collection = chromadb.create_collection(name="colors")
+add(dir, db)
+
+db.knn()

@@ -14,7 +14,7 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
 
     # Find the colors that occurs most often
     palette = paletted.getpalette()
-    color_counts = sorted(paletted.getcolors(), reverse=True)
+    color_counts = sorted(paletted.getcolors(), reverse=True) #inconsistent sorting, replace with one in vector store
 
     dominant_colors = []
     max = color_counts[0][0]
@@ -29,7 +29,7 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
             # only add colors if they are distinct from other dominant colors
             if (i == 0 or all(dist(c1, rgb) > 100 for c1 in dominant_colors)):
                 palette_index = color_counts[i][1]
-                dominant_colors.append(palette[palette_index*3:palette_index*3+3])
+                dominant_colors.append(palette[palette_index*3:palette_index*3+3].append(color_counts[i][0]))
         i += 1
 
     return dominant_colors
@@ -38,8 +38,10 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
 # weighted Euclidean distance
 # formula: https://www.compuphase.com/cmetric.htm#:~:text=A%20low%2Dcost%20approximation)
 def dist(c1, c2):
-    c1r, c1g, c1b = c1
-    c2r, c2g, c2b = c2
+    
+    # red, blue, green, frequency in image
+    c1r, c1g, c1b, = c1[:3]
+    c2r, c2g, c2b = c2[:3]
 
     rm = (c1r + c2r)/2
     r = c1r - c2r
@@ -50,7 +52,12 @@ def dist(c1, c2):
     y =  4*(g**2)
     z = (2 + ((255-rm)/256))*(b**2)
 
-    return np.sqrt(x + y + z)
+    if len(c1) == 4:
+        c1f = c1[3]
+        c2f = c2[3]
+        return np.sqrt(x + y + z) / ((c1f**2)*(c2f**2))
+    else:
+        return np.sqrt(x + y + z)
 
 
 def create_bar(height, width, color):
@@ -72,19 +79,22 @@ def show(path):
     Image.fromarray(img_bar).show(title='Dominant colors')
     input()
 
-dir = "images"
-client = chromadb.PersistentClient()
-collection = chromadb.create_collection(name="colors")
-for f in os.listdir(dir):
-    if os.path.isdir(f):
+
+if __name__ == "__main__":
+    def add(f):
         for p in os.listdir(f):
-            show(os.path.join(dir, p))
-
-
-for file in files:
-    colors = get_dominant_colors(file)
-    fids = [file]*len(colors)
-    collection.add(
-        embeddings= colors,
-        ids = fids,
-    )
+            # show(os.path.join(dir, p))
+            colors = get_dominant_colors(os.path.join(dir, p))
+            fids = [os.path.join(dir, p)]*len(colors)
+            collection.add(
+                embeddings= colors,
+                ids = fids,
+            )
+    dir = "images"
+    client = chromadb.PersistentClient()
+    collection = chromadb.create_collection(name="colors")
+    for f in os.listdir(dir):
+        if os.path.isdir(f):
+            add(f)
+        else:
+            add(dir)
