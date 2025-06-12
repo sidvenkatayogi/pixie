@@ -3,3 +3,4 @@
 *.jpg
 *.jpeg
 chroma/
+__pycache__/

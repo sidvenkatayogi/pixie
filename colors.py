@@ -1,20 +1,23 @@
+# TODO improve dominant colors
 from PIL import Image
 import numpy as np
 import os
 import chromadb
 from chromadb import Documents, EmbeddingFunction, Embeddings
 
-def get_dominant_colors(pil_img, palette_size=16, num_colors=5):
+def get_dominant_colors(image, palette_size=16, num_colors=5):
     # Resize image to speed up processing
-    img = pil_img.resize((int(pil_img.width/100), int(pil_img.height/100)), resample= 0)
-    # img.show()
+    if image.width >= 512 and image.height >= 512:
+        img = image.resize((int(image.width/100), int(image.height/100)), resample= 0)
+    else:
+        img = image
 
     # Reduce colors (uses k-means internally)
     paletted = img.convert('P', palette=Image.ADAPTIVE, colors= palette_size)
 
     # Find the colors that occurs most often
     palette = paletted.getpalette()
-    color_counts = sorted(paletted.getcolors(), reverse=True) #inconsistent sorting, replace with one in vector store
+    color_counts = sorted(paletted.getcolors(), reverse=True) # inconsistent sorting, replace with one in vector store
 
     dominant_colors = []
     max = color_counts[0][0]
@@ -39,9 +42,6 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=5):
 # weighted Euclidean distance
 # formula: https://www.compuphase.com/cmetric.htm#:~:text=A%20low%2Dcost%20approximation)
 def dist(c1, c2):
-    
-    # red, blue, green, frequency in image
-
     c1r, c1g, c1b, = c1[:3]
     c2r, c2g, c2b = c2[:3]
 
@@ -61,11 +61,8 @@ def dist(c1, c2):
     else:
         return np.sqrt(x + y + z)
 
+
 def multidist(i1, i2, id= None):
-    # print(len(i1))
-    # print(id)
-
-
     i1 = i1.reshape(int(len(i1)/4), 4)
     i2 = i2.reshape(int(len(i2)/4), 4)
     distance = 0
@@ -74,13 +71,8 @@ def multidist(i1, i2, id= None):
         for j, rgbf2 in enumerate(i2):
             f1 = rgbf1[-1]
             f2 = rgbf2[-1]
-            # distance += (dist(rgbf1[:3], rgbf2[:3]) * ((i + 1)/(f1))**2 * ((j + 1)/f2)**2) # * (1 + np.abs(i - j)))
-            # if (i != j):
-            #     a = 1 / (i+1) / j
             distance += np.log((dist(rgbf1[:3], rgbf2[:3]) / (i + 1) / (j + 1))  + 1)
     return distance
-
-
 
 
 def create_bar(height, width, color):
