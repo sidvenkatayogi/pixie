@@ -4,7 +4,7 @@ import os
 import chromadb
 from chromadb import Documents, EmbeddingFunction, Embeddings
 
-def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
+def get_dominant_colors(pil_img, palette_size=16, num_colors=5):
     # Resize image to speed up processing
     img = pil_img.resize((int(pil_img.width/100), int(pil_img.height/100)), resample= 0)
     # img.show()
@@ -25,12 +25,13 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
             palette_index = color_counts[i][1]
 
             # palette is 1 x (3*num palette colors)
-            rgb = palette[palette_index*3:palette_index*3+3]
+            rgbf = palette[palette_index*3:palette_index*3+3] + [color_counts[i][0]]
             # only add colors if they are distinct from other dominant colors
-            if (i == 0 or all(dist(c1, rgb) > 100 for c1 in dominant_colors)):
+            if (i == 0 or all(dist(c1[:3], rgbf[:3]) > 100 for c1 in dominant_colors)):
                 palette_index = color_counts[i][1]
-                dominant_colors.append(palette[palette_index*3:palette_index*3+3].append(color_counts[i][0]))
+                dominant_colors.append(rgbf)
         i += 1
+    dominant_colors = np.array(dominant_colors).reshape(-1)
 
     return dominant_colors
 
@@ -40,6 +41,7 @@ def get_dominant_colors(pil_img, palette_size=16, num_colors=10):
 def dist(c1, c2):
     
     # red, blue, green, frequency in image
+
     c1r, c1g, c1b, = c1[:3]
     c2r, c2g, c2b = c2[:3]
 
@@ -59,10 +61,31 @@ def dist(c1, c2):
     else:
         return np.sqrt(x + y + z)
 
+def multidist(i1, i2, id= None):
+    # print(len(i1))
+    # print(id)
+
+
+    i1 = i1.reshape(int(len(i1)/4), 4)
+    i2 = i2.reshape(int(len(i2)/4), 4)
+    distance = 0
+
+    for i, rgbf1 in enumerate(i1):
+        for j, rgbf2 in enumerate(i2):
+            f1 = rgbf1[-1]
+            f2 = rgbf2[-1]
+            # distance += (dist(rgbf1[:3], rgbf2[:3]) * ((i + 1)/(f1))**2 * ((j + 1)/f2)**2) # * (1 + np.abs(i - j)))
+            # if (i != j):
+            #     a = 1 / (i+1) / j
+            distance += np.log((dist(rgbf1[:3], rgbf2[:3]) / (i + 1) / (j + 1))  + 1)
+    return distance
+
+
+
 
 def create_bar(height, width, color):
     bar = np.zeros((height, width, 3), np.uint8)
-    bar[:] = color
+    bar[:] = color[:3]
     red, green, blue = int(color[2]), int(color[1]), int(color[0])
     return bar, (red, green, blue)
 
@@ -70,31 +93,18 @@ def create_bar(height, width, color):
 def show(path):
     img = Image.open(path)
     bars = []
-    for color in get_dominant_colors(img, num_colors= 5):
+    cols = get_dominant_colors(img, num_colors= 5)
+    for color in cols.reshape(int(len(cols)/4), 4):
         bar, rgb = create_bar(200, 200, color)
         bars.append(bar)
 
     img_bar = np.hstack(bars)
     img.show(title=os.path.basename(path))
     Image.fromarray(img_bar).show(title='Dominant colors')
-    input()
+    input("Next?")
 
 
 if __name__ == "__main__":
-    def add(f):
-        for p in os.listdir(f):
-            # show(os.path.join(dir, p))
-            colors = get_dominant_colors(os.path.join(dir, p))
-            fids = [os.path.join(dir, p)]*len(colors)
-            collection.add(
-                embeddings= colors,
-                ids = fids,
-            )
-    dir = "images"
-    client = chromadb.PersistentClient()
-    collection = chromadb.create_collection(name="colors")
-    for f in os.listdir(dir):
-        if os.path.isdir(f):
-            add(f)
-        else:
-            add(dir)
+    dir = "images/sidvenkatayogi"
+    for p in os.listdir(dir):
+        show(os.path.join(dir, p))

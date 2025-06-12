@@ -2,18 +2,23 @@ import colors as c
 import numpy as np
 import os
 from vectorDB import VectorDB
+from PIL import Image
 
 def add(dir, db):
     for f in os.listdir(dir):
-        if os.path.isdir(f):
-            add(os.path.join(dir, f), db)
+        path = os.path.join(dir, f)
+        if os.path.isdir(path):
+            add(path, db)
         else:
-            cols = c.get_dominant_colors(os.path.join(dir, f))
-            ids = [ f"{f} ({i})" for i, id in range(len(cols))]
+            # print(path)
+            cols = c.get_dominant_colors(Image.open(path), num_colors= 3)
+            # ids = [ f"{path} ({i})" for i in range(len(cols))]
+
             # ids = [os.path.join(dir, f)]*len(cols) # ids cant be the same
-            db.add(
-                embeddings= cols,
-                ids = ids,
+            id = path + " (0)"
+            db.add_vector(
+                id = id,
+                vec = cols
             )
 
 dir = "images"
@@ -22,4 +27,9 @@ db = VectorDB()
 # collection = chromadb.create_collection(name="colors")
 add(dir, db)
 
-db.knn()
+images = db.knn(c.get_dominant_colors(Image.open("images/cordeliacarla/C8XW-uCxAoY.jpg"), num_colors= 3))
+for img, distance in images:
+    print(img + " " + str(distance))
+    image = Image.open(img[:-4])
+    image.show(title=os.path.basename(img))
+    input()

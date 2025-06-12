@@ -18,10 +18,16 @@ class VectorDB:
         self.vector_index[id] = {}
         self.update_index(id, vec)
 
+
+    def add_vectors(self, ids, vecs):
+        for id, vec in zip(ids, vecs):
+            self.add_vector(id, vec)
+
+
     def get_vector(self, id):
         return self.vector_data.get(id)
 
-    def update(self, id, vec):
+    def update_index(self, id, vec):
         """
         Update the index
 
@@ -30,13 +36,15 @@ class VectorDB:
             vec (numpy.ndarray)
         """
         for id2, vec2 in self.vector_data.items():
-            distance = colors.dist(vec, vec2)
+            distance = colors.multidist(vec, vec2)
             self.vector_index[id2][id] = distance
 
     def knn(self, query, k = 5):
         results = []
+        # for rgbf in query:
         for id, vec in self.vector_data.items():
-            distance = colors.dist(query, vec)
+            distance = colors.multidist(query, vec, id)
             results.append((id, distance))
-        results.sort(key= lambda x: x[1], reverse= True)
+        results.sort(key= lambda x: x[1])
+        # print(results)
         return results[:k]
