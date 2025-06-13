@@ -44,9 +44,9 @@ def ocr(path):
                 line_words = []
                 for word in line.words:
                     # Check confidence (doctr confidence is usually a float between 0 and 1)
-                    if word.confidence >= 0.85 and len(word.value) > 1:  # 75% confidence
+                    if word.confidence >= 0.90 and len(word.value) > 1:  # 75% confidence
                         line_words.append(word.value)
-                        print(path)
+                        # print(path)
                 if line_words:
                     block_text.append(" ".join(line_words))
             if block_text:
