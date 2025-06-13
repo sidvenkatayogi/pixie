@@ -41,10 +41,8 @@ class VectorDB:
 
     def knn(self, query, k = 5):
         results = []
-        # for rgbf in query:
         for id, vec in self.vector_data.items():
             distance = colors.multidist(query, vec, id)
             results.append((id, distance))
         results.sort(key= lambda x: x[1])
-        # print(results)
         return results[:k]

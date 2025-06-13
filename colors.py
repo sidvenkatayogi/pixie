@@ -17,7 +17,7 @@ def get_dominant_colors(image, palette_size=16, num_colors=5):
 
     # Find the colors that occurs most often
     palette = paletted.getpalette()
-    color_counts = sorted(paletted.getcolors(), reverse=True) # inconsistent sorting, replace with one in vector store
+    color_counts = sorted(paletted.getcolors(), reverse=True)
 
     dominant_colors = []
     max = color_counts[0][0]
