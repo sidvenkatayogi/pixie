@@ -1,10 +1,38 @@
 import numpy as np
 import colors
+import os
+import json
+import pickle
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+class NumpyDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+    def object_hook(self, obj):
+        # """
+        # Converts lists back into NumPy arrays if applicable.
+        # """
+        # if isinstance(obj, list):
+        #     return np.array(obj)
+        # return obj
+        for key, value in obj.items():
+            if isinstance(value, list):
+                obj[key] = np.array(value)
+            elif isinstance(value, dict):
+                obj[key] = self.object_hook(value)
+        return obj
+    
 
 class VectorDB:
-    def __init__(self):
-        self.vector_data = {}
-        self.vector_index = {}
+    def __init__(self, name, vector_data = {}, vector_index = {}):
+        self.name = name
+        self.vector_data = vector_data
+        self.vector_index = vector_index
 
     def add_vector(self, id, vec):
         """
@@ -25,7 +53,7 @@ class VectorDB:
 
 
     def get_vector(self, id):
-        return self.vector_data.get(id)
+        return np.asarray(self.vector_data.get(id))
 
     def update_index(self, id, vec):
         """
@@ -41,8 +69,56 @@ class VectorDB:
 
     def knn(self, query, k = 5):
         results = []
+        # print(self.vector_data.items())
         for id, vec in self.vector_data.items():
             distance = colors.multidist(query, vec, id)
             results.append((id, distance))
         results.sort(key= lambda x: x[1])
         return results[:k]
+    
+    def save_DB(self, folder_name= "vectorDBn"):
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        # d = {self.name : {"data" : self.vector_data, "index" : self.vector_index}}
+
+        # with open(os.path.join(folder_name, f"{self.name}.json"), "w") as f:
+        #     json.dump(d, f, cls= NumpyEncoder, indent=4)
+        if not os.path.exists(folder_name):
+            os.makedirs(os.path.join(folder_name, "index"))
+
+        a = list(self.vector_data.values())
+        k = list(self.vector_data.keys())
+        print(a)
+        np.savez(file= os.path.join(folder_name, "data.npz"), args= a, kwds= k)
+        
+        for id, idx in self.vector_index.items():
+            a = list(idx.values())
+            k = list(idx.keys())
+            np.savez(file= os.path.join(folder_name, "index", "data.npz"), args= a, kwds= k)
+
+    @classmethod
+    def get_DBj(cls, name, folder_name= "vectorDBn"):
+        d = {}
+        with open(os.path.join(folder_name, f"{name}.json"), "r") as f:
+            d = json.load(f, cls= NumpyDecoder)
+
+        vd = d[name]["data"]
+        vi = d[name]["index"]
+
+        return cls(name= name, vector_data= vd, vector_index= vi)
+    
+    def get_DB(cls, name, folder_name= "vectorDBn"):
+        # d = {}
+        # with open(os.path.join(folder_name, f"{name}.json"), "r") as f:
+        #     d = json.load(f, cls= NumpyDecoder)
+
+        # vd = d[name]["data"]
+        # vi = d[name]["index"]
+
+        vd = np.load(os.path.join(folder_name, "data.npz"))
+        vi = {}
+        for f in os.listdir(os.path.join(folder_name, "index")):
+            vi[os.path.split(f)[0]] = np.load(os.path.join(folder_name, "index", f))
+
+        return cls(name= name, vector_data= vd, vector_index= vi)
