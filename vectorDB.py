@@ -80,45 +80,18 @@ class VectorDB:
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
 
-        # d = {self.name : {"data" : self.vector_data, "index" : self.vector_index}}
+        d = {self.name : {"data" : self.vector_data, "index" : self.vector_index}}
 
-        # with open(os.path.join(folder_name, f"{self.name}.json"), "w") as f:
-        #     json.dump(d, f, cls= NumpyEncoder, indent=4)
-        if not os.path.exists(folder_name):
-            os.makedirs(os.path.join(folder_name, "index"))
-
-        a = list(self.vector_data.values())
-        k = list(self.vector_data.keys())
-        print(a)
-        np.savez(file= os.path.join(folder_name, "data.npz"), args= a, kwds= k)
-        
-        for id, idx in self.vector_index.items():
-            a = list(idx.values())
-            k = list(idx.keys())
-            np.savez(file= os.path.join(folder_name, "index", "data.npz"), args= a, kwds= k)
+        with open(os.path.join(folder_name, f"{self.name}.json"), "w") as f:
+            json.dump(d, f, cls= NumpyEncoder, indent=4)
 
     @classmethod
-    def get_DBj(cls, name, folder_name= "vectorDBn"):
+    def get_DB(cls, name, folder_name= "vectorDBn"):
         d = {}
         with open(os.path.join(folder_name, f"{name}.json"), "r") as f:
             d = json.load(f, cls= NumpyDecoder)
 
         vd = d[name]["data"]
         vi = d[name]["index"]
-
-        return cls(name= name, vector_data= vd, vector_index= vi)
-    
-    def get_DB(cls, name, folder_name= "vectorDBn"):
-        # d = {}
-        # with open(os.path.join(folder_name, f"{name}.json"), "r") as f:
-        #     d = json.load(f, cls= NumpyDecoder)
-
-        # vd = d[name]["data"]
-        # vi = d[name]["index"]
-
-        vd = np.load(os.path.join(folder_name, "data.npz"))
-        vi = {}
-        for f in os.listdir(os.path.join(folder_name, "index")):
-            vi[os.path.split(f)[0]] = np.load(os.path.join(folder_name, "index", f))
 
         return cls(name= name, vector_data= vd, vector_index= vi)

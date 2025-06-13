@@ -8,8 +8,6 @@ from vectorDB import VectorDB
 import time
 
 
-
-
 def search(db, query, k = 5):
     images = None
     if type(db) == VectorDB:
@@ -22,7 +20,7 @@ def search(db, query, k = 5):
 db = VectorDB.get_DB(name= "colors")
 
 k = 5
-query = Image.new('RGB', (10, 10), (255, 255, 255))
+query = Image.new('RGB', (10, 10), (204, 12, 12))
 # path = ""
 # query = Image.open(path)
 
