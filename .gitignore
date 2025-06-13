@@ -4,4 +4,3 @@
 *.jpeg
 chroma/
 __pycache__/
-.gitignore

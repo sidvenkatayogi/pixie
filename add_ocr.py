@@ -1,33 +1,39 @@
 from PIL import Image
 import chromadb
-from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from chromadb.utils.data_loaders import ImageLoader
 import numpy as np
 from tqdm import tqdm
 import torch
 import os
+from doctr.io import DocumentFile
+from doctr.models import ocr_predictor
+import json
+
 # db_path = ""
 
 client = chromadb.PersistentClient()
 
-import torch
+# emb_fn = SentenceTransformerEmbeddingFunction(
+#     model_name="all-MiniLM-L6-v2"
+# )
 
-emb_fn = OpenCLIPEmbeddingFunction(model_name= "ViT-B-32",
-                                   checkpoint= "laion2b_s34b_b79k",
-                                   device= "cuda" if torch.cuda.is_available() else "cpu")
+predictor = ocr_predictor(
+    det_arch="db_mobilenet_v3_large",
+    reco_arch="crnn_mobilenet_v3_small",
+    pretrained=True,
+)
 
 collection = client.get_or_create_collection(
-    name= "multimodal_collection",
-    embedding_function= emb_fn,
-    data_loader= ImageLoader()
+    name= "textual_collection",
+    # embedding_function= emb_fn
     )
+
+images = {}
 
 def add_images_to_collection(folder_path, explore = False):
 
     image_paths = []
-
-    # [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
-    #                if os.path.isfile(os.path.join(folder_path, file)) and file.lower().endswith((""))]
     
     for file in tqdm(os.listdir(folder_path), desc= f"Exploring... ({folder_path})", disable= not explore):
         # print(folder_path)
@@ -40,12 +46,16 @@ def add_images_to_collection(folder_path, explore = False):
     if (len(image_paths) > 0):
         for image_path in tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB... ({folder_path})"):
             try:
-                image = np.array(Image.open(image_path))
-                collection.add(
-                    # ids= [os.path.basename(image_path)],
-                    ids= [image_path], # id is 
-                    images= [image]
-                )
+                image = DocumentFile.from_images(image_path)
+                result = predictor(image)
+                text = result.render()
+                if text != "":
+                    collection.add(
+                        ids= [image_path],
+                        documents= [text],
+                        # metadatas= [result.export()[0]]
+                    )
+                    images[image_path] = result.export()
             except Exception as e:
                 print(f"Error processing {image_path}: {e}")
 
@@ -53,3 +63,6 @@ def add_images_to_collection(folder_path, explore = False):
 image_folder_path= "images"
 
 add_images_to_collection(image_folder_path, explore= True)
+
+with open("boxes.json", "w") as file: 
+        json.dump(images, file)
