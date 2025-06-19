@@ -7,8 +7,15 @@ from hashDB import HashDB
 from vectorDB import VectorDB
 import time
 
+db = VectorDB.get_DB(name= "colors")
 
-def search(db, query, k = 5):
+k = 5
+query = Image.new('RGB', (10, 10), (204, 12, 12))
+# path = ""
+# query = Image.open(path)
+
+def search(query : str, k = 5):
+    Image.open(query)
     images = None
     if type(db) == VectorDB:
         images = db.knn(c.get_dominant_colors(query, num_colors= 3), k= k)
@@ -17,17 +24,12 @@ def search(db, query, k = 5):
     return images
 
 
-db = VectorDB.get_DB(name= "colors")
+# images = search(query, k)
 
-k = 5
-query = Image.new('RGB', (10, 10), (204, 12, 12))
-# path = ""
-# query = Image.open(path)
 
-images = search(db, query, k)
 
-for img, distance in images:
-    print(img + " " + str(distance))
-    image = Image.open(img)
-    image.show(title=os.path.basename(img))
-    time.sleep(1)
+# for img, distance in images:
+#     print(img + " " + str(distance))
+#     image = Image.open(img)
+#     image.show(title=os.path.basename(img))
+#     time.sleep(1)

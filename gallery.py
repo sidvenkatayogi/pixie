@@ -1,11 +1,13 @@
 import sys
 import os
+import numpy as np
+import random
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
                              QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QWidget)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF
 import time
-
+import search_color
 class CustomGraphicsView(QGraphicsView):
     """
     A custom QGraphicsView that enables interactive panning and zooming.
@@ -182,6 +184,67 @@ class ImageGalleryApp(QMainWindow):
         print(f"Added {len(self.scene.items())} images to the scene.")
         print("Scene origin (0,0) is in the center of the initial view.")
         print("Use left mouse button to drag/pan, mouse wheel to zoom.")
+
+    def render(self, size, path, x, y):
+        pixmap = self.generate_dummy_image(size, "Image 4 (700,-500)", QColor(255, 255, 180))
+        item = QGraphicsPixmapItem(pixmap)
+        
+        item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
+        self.scene.addItem(item)
+
+
+    def hex_spiral(self, images):
+        sq = 256
+        last_pos = (0,0)
+        self.render(sq, images[0][0], last_pos[0], last_pos[1])
+        level = 0
+
+        # for i, path in enumerate(images[1:][0], start= 1):
+        #     if i > (level * 6):
+        #         level += 1
+        for level in range(1, np.ceil((-3 + np.sqrt(12 * len(images) - 3)) / 6) + 1):
+            sides = []
+            for c in range(0, 5):
+                sides.append(range((c * level) + 1, ((c+1) * level) + 1))
+            # tr = [None] * (level)
+            # t = [None] * (level)
+            # tl = [None] * (level)
+            # bl = [None] * (level)
+            # b = [None] * (level)
+            # br = [None] * (level)
+
+            # sides = [tr, t, tl, bl, b, br]
+            # sides = [range(1, level + 1)] * 6
+            start = (level - 1) * level * 3 + 1
+            end = np.min(start + level * 6, len(images) - 1)
+            side = 0
+            
+            for i, image in enumerate(1, images[start: end + 1]):
+                if i % len(sides) == 1:
+                    random.shuffle(sides)
+                if side > 6:
+                    side = 0
+
+                target = None
+                j = random.randint(0, len(sides[side]))
+                done = False
+                # while target == None:
+                #     target = sides[side][j]
+                #     if target == None:
+                #         j = random.randint(0, len(sides[side]) - 1)
+
+                random_index = random.randint(0, len(sides[side]) - 1)
+                randomly_selected_item = sides[side].pop(random_index) 
+
+
+                    
+
+                
+
+
+
+
+
 
 
 if __name__ == "__main__":
