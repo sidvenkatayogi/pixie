@@ -93,10 +93,10 @@ def show(path):
     img_bar = np.hstack(bars)
     img.show(title=os.path.basename(path))
     Image.fromarray(img_bar).show(title='Dominant colors')
-    input("Next?")
 
 
 if __name__ == "__main__":
     dir = "images/sidvenkatayogi"
     for p in os.listdir(dir):
         show(os.path.join(dir, p))
+        input("ENTER for next image")

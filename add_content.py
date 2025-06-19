@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import torch
 import os
+
 # db_path = ""
 
 client = chromadb.PersistentClient()
