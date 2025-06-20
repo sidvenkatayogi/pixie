@@ -28,7 +28,7 @@ class CustomGraphicsView(QGraphicsView):
 
         # Set the initial view to be centered around (0,0) and perhaps scale it
         # The scene rect is typically infinite, but we can set a hint.
-        self.scene().setSceneRect(-2000, -2000, 4000, 4000) # Example large scene area
+        self.scene().setSceneRect(-4000, -4000, 8000, 8000) # Example large scene area
         self.centerOn(0, 0) # Center the view on the origin
 
     def mousePressEvent(self, event):
@@ -120,7 +120,8 @@ class ImageGalleryApp(QMainWindow):
         self.scene = QGraphicsScene()
         self.view = CustomGraphicsView(self.scene)
 
-        self.setup_images()
+        # self.setup_images()
+        # self.hex_spiral(np.arange(0, 580))
 
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
@@ -185,72 +186,73 @@ class ImageGalleryApp(QMainWindow):
         print("Scene origin (0,0) is in the center of the initial view.")
         print("Use left mouse button to drag/pan, mouse wheel to zoom.")
 
-    def render(self, size, path, x, y):
-        pixmap = self.generate_dummy_image(size, "Image 4 (700,-500)", QColor(255, 255, 180))
+    def render(self, size, x, y, name, h = 10, s = 255, l = 128):
+        color = QColor()
+        color.setHsl(int(h), int(s), int(l), alpha=255)
+        pixmap = self.generate_dummy_image(size, f"{name} ({x},{y})", color)
         item = QGraphicsPixmapItem(pixmap)
         
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
-
+        # print(f"rendered: {name} ({x},{y})")
 
     def hex_spiral(self, images):
         sq = 256
-        last_pos = (0,0)
-        self.render(sq, images[0][0], last_pos[0], last_pos[1])
+        # self.render(sq, images[0][0], last_pos[0], last_pos[1])
+        self.render(sq, 0, 0, 0)
         level = 0
-
-        # for i, path in enumerate(images[1:][0], start= 1):
-        #     if i > (level * 6):
-        #         level += 1
-        for level in range(1, np.ceil((-3 + np.sqrt(12 * len(images) - 3)) / 6) + 1):
+        for level in range(1, int(np.ceil((-3 + np.sqrt(12 * len(images) - 3)) / 6) + 1)):
             sides = []
-            for c in range(0, 5):
-                sides.append(range((c * level) + 1, ((c+1) * level) + 1))
-            # tr = [None] * (level)
-            # t = [None] * (level)
-            # tl = [None] * (level)
-            # bl = [None] * (level)
-            # b = [None] * (level)
-            # br = [None] * (level)
+            for c in range(0, 6):
+                sides.append(list(range((c * level) + 1, ((c+1) * level) + 1)))
 
-            # sides = [tr, t, tl, bl, b, br]
-            # sides = [range(1, level + 1)] * 6
+            # print(sides)
+            print(f"level {level}")
+            h = 0
+
             start = (level - 1) * level * 3 + 1
-            end = np.min(start + level * 6, len(images) - 1)
-            side = 0
-            
-            for i, image in enumerate(1, images[start: end + 1]):
-                if i % len(sides) == 1:
-                    random.shuffle(sides)
-                if side > 6:
-                    side = 0
+            end = min(start + level * 6, len(images))
+            for i, image in enumerate(images[start : end]):
+                if i % 6 == 0:
+                    # random.shuffle(sides)
+                    pass
 
-                target = None
-                j = random.randint(0, len(sides[side]))
-                done = False
-                # while target == None:
-                #     target = sides[side][j]
-                #     if target == None:
-                #         j = random.randint(0, len(sides[side]) - 1)
-
-                random_index = random.randint(0, len(sides[side]) - 1)
-                randomly_selected_item = sides[side].pop(random_index) 
+                # idx = random.randint(0, len(sides[i % 6]) - 1)
+                idx = 0
+                place = sides[i % 6].pop(idx)
 
 
-                    
+                placem = place % level
+                x, y = 0, 0
+                if place <= level: # tr diagonal
+                    x = (level * sq) - ((place - 1) * (sq / 2))
+                    y = -(place - 1) * sq
+                elif place <= level * 2: # t line
+                    x = level * sq/2 - (place - level - 1) * sq
+                    y = -level * sq
+                elif place <= level * 3: # tl diagonal
+                    x = -(level * sq/2) - ((place - (level * 2) - 1)) * (sq / 2)
+                    y = -level * sq + (place - (level * 2) - 1) * sq
+                elif place <= level * 4: # bl diagonal
+                    x = -level * sq + (place - (level * 3) - 1) * sq/2
+                    y = (place - (level * 3) - 1) * sq
+                elif place <= level * 5: # b line
+                    x = -level * sq / 2 + (place - (level * 4) - 1) * sq
+                    y = level * sq
+                elif place <= level * 6: # br diagonal
+                    x = level * sq/2 + (place - (level * 5) - 1) * sq/2
+                    y = level * sq - (place - (level * 5) - 1) * sq
 
-                
-
-
-
-
-
+                self.render(size=sq, x=x, y=y, name=image, h= h)
+                h += 359/(level * 6)
+                QApplication.processEvents()
+                time.sleep(0.01)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
-    
+    window.hex_spiral(np.arange(0, 580))
     sys.exit(app.exec_())
 
