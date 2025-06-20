@@ -28,7 +28,7 @@ class CustomGraphicsView(QGraphicsView):
 
         # Set the initial view to be centered around (0,0) and perhaps scale it
         # The scene rect is typically infinite, but we can set a hint.
-        self.scene().setSceneRect(-4000, -4000, 8000, 8000) # Example large scene area
+        # self.scene().setSceneRect(-4000, -4000, 8000, 8000) # Example large scene area
         self.centerOn(0, 0) # Center the view on the origin
 
     def mousePressEvent(self, event):
@@ -189,7 +189,8 @@ class ImageGalleryApp(QMainWindow):
     def render(self, size, x, y, name, h = 10, s = 255, l = 128):
         color = QColor()
         color.setHsl(int(h), int(s), int(l), alpha=255)
-        pixmap = self.generate_dummy_image(size, f"{name} ({x},{y})", color)
+        # pixmap = self.generate_dummy_image(size, f"{name} ({x},{y})", color)
+        pixmap = self.generate_dummy_image(size, f"", color)
         item = QGraphicsPixmapItem(pixmap)
         
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
@@ -214,11 +215,11 @@ class ImageGalleryApp(QMainWindow):
             end = min(start + level * 6, len(images))
             for i, image in enumerate(images[start : end]):
                 if i % 6 == 0:
-                    # random.shuffle(sides)
-                    pass
+                    random.shuffle(sides)
+                    # pass
 
-                # idx = random.randint(0, len(sides[i % 6]) - 1)
-                idx = 0
+                idx = random.randint(0, len(sides[i % 6]) - 1)
+                # idx = 0
                 place = sides[i % 6].pop(idx)
 
 
@@ -243,16 +244,20 @@ class ImageGalleryApp(QMainWindow):
                     x = level * sq/2 + (place - (level * 5) - 1) * sq/2
                     y = level * sq - (place - (level * 5) - 1) * sq
 
+                h = place / (level * 6) * 359
+
+                # h %= 360
+
                 self.render(size=sq, x=x, y=y, name=image, h= h)
-                h += 359/(level * 6)
+                
                 QApplication.processEvents()
-                time.sleep(0.01)
+                # time.sleep(0.003)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
-    window.hex_spiral(np.arange(0, 580))
+    window.hex_spiral(np.arange(0, 102700))
     sys.exit(app.exec_())
 
