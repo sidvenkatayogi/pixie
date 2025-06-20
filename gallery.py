@@ -5,100 +5,77 @@ import random
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
                              QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QWidget)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
-from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF
+from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
 import time
-import search_color
+import math
+
 class CustomGraphicsView(QGraphicsView):
-    """
-    A custom QGraphicsView that enables interactive panning and zooming.
-    """
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
-        self.setRenderHint(QPainter.Antialiasing) # For smoother rendering
-        self.setRenderHint(QPainter.SmoothPixmapTransform) # For smoother image scaling
+        # smooth rendering and scaling
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
 
-        # Set up interactive features
-        self.setDragMode(QGraphicsView.NoDrag) # Initial drag mode
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse) # Zoom/Pan around mouse cursor
-        # self.setTransformationAnchor(QGraphicsView.NoAnchor) # Zoom/Pan around mouse cursor
-        # self.setResizeAnchor(QGraphicsView.AnchorUnderMouse) # Resize around mouse cursor
-
+        self.setDragMode(QGraphicsView.NoDrag)
+        # zoom/pan about mouse cursor
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        
         self.panning = False
         self.last_pos = QPointF()
 
-        # Set the initial view to be centered around (0,0) and perhaps scale it
-        # The scene rect is typically infinite, but we can set a hint.
-        # self.scene().setSceneRect(-4000, -4000, 8000, 8000) # Example large scene area
-        self.centerOn(0, 0) # Center the view on the origin
+        self.centerOn(0, 0)
 
+    # start panning
     def mousePressEvent(self, event):
-        """
-        Starts panning when the left mouse button is pressed.
-        """
-        if event.button() == Qt.LeftButton: # Use left button for panning
+        if event.button() == Qt.LeftButton: # use left button for panning
             self.panning = True
             self.last_pos = event.pos()
-            print
-            self.setCursor(Qt.ClosedHandCursor) # Change cursor to indicate dragging
+            self.setCursor(Qt.ClosedHandCursor)
             event.accept()
         else:
             super().mousePressEvent(event)
 
+    # track mouse position and pan
     def mouseMoveEvent(self, event):
-        """
-        Performs panning if the panning flag is active.
-        """
         if self.panning:
-            # Calculate the difference in scene coordinates
+            # calculate the difference in scene coordinates
             old_scene_pos = self.mapToScene(self.last_pos)
             new_scene_pos = self.mapToScene(event.pos())
             delta = old_scene_pos - new_scene_pos
             
+            # current mouse pos
             self.last_pos = event.pos()
             
-            # Get current center and adjust it
+            # get current center and adjust it
             current_center = self.mapToScene(self.viewport().rect().center())
             new_center = current_center + delta
             self.centerOn(new_center)
-            
             event.accept()
-        # else:
-        #     super().mouseMoveEvent(event)
 
+    # stop panning when mouse released
     def mouseReleaseEvent(self, event):
-        """
-        Stops panning when the left mouse button is released.
-        """
         if event.button() == Qt.LeftButton:
             self.panning = False
-            self.setCursor(Qt.ArrowCursor) # Restore cursor
+            self.setCursor(Qt.ArrowCursor)
             event.accept()
-        # else:
-        #     super().mouseReleaseEvent(event)
 
+    # zoom with mouse wheel
     def wheelEvent(self, event):
-        """
-        Handles zooming using the mouse wheel.
-        """
-        zoom_in_factor = 1.25 # How much to zoom in/out
-        zoom_out_factor = 1 / zoom_in_factor
+        zoom_factor = 1.25
 
-        # Determine zoom factor based on wheel direction
-        if event.angleDelta().y() > 0: # Scroll up (zoom in)
-            zoom_factor = zoom_in_factor
-        else: # Scroll down (zoom out)
-            zoom_factor = zoom_out_factor
-
-        # Get the scene position under the mouse before zooming
+        # get scene position under mouse before zooming
         mouse_scene_pos = self.mapToScene(event.pos())
+
+        # apply zoom transformation
+        if event.angleDelta().y() > 0: # scroll up (zoom in)
+            self.scale(zoom_factor, zoom_factor)
+        else: # scroll down (zoom out)
+            self.scale(1 / zoom_factor, 1 / zoom_factor)
         
-        # Apply the scaling transformation
-        self.scale(zoom_factor, zoom_factor)
-        
-        # Get the scene position under the mouse after zooming
+        # get scene position under mouse after zooming
         new_mouse_scene_pos = self.mapToScene(event.pos())
         
-        # Calculate the difference and adjust the view center
+        # calculate difference and adjust view
         delta = new_mouse_scene_pos - mouse_scene_pos
         current_center = self.mapToScene(self.viewport().rect().center())
         new_center = current_center - delta
@@ -107,21 +84,24 @@ class CustomGraphicsView(QGraphicsView):
         event.accept()
 
 
-
 class ImageGalleryApp(QMainWindow):
-    """
-    Main application window for the image gallery.
-    """
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Interactive Image Gallery")
-        self.setGeometry(100, 100, 1024, 768) # Initial window size
+        self.setWindowTitle("gallery")
+        self.setGeometry(100, 100, 1024, 768)
 
         self.scene = QGraphicsScene()
         self.view = CustomGraphicsView(self.scene)
 
-        # self.setup_images()
-        # self.hex_spiral(np.arange(0, 580))
+        self.image_data = []
+        self.STD_SIZE = 256
+        self.STD_SPACE = self.STD_SIZE * 1.85
+        
+        self.animation_timer = QTimer()
+        self.animation_timer.timeout.connect(self.update_animation)
+        self.animation_timer.start(16)  # ~60 FPS (16ms intervals)
+        
+        self.animation_time = 0.0
 
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
@@ -129,135 +109,172 @@ class ImageGalleryApp(QMainWindow):
         self.setCentralWidget(central_widget)
 
     def generate_dummy_image(self, size, text, color):
-        """
-        Generates a QPixmap with a specific size, text, and background color.
-        This avoids needing external image files for the example.
-        """
         image = QImage(size, size, QImage.Format_ARGB32)
-        image.fill(color) # Fill with background color
+        image.fill(color)
 
         painter = QPainter(image)
         painter.setPen(Qt.black) # Text color
-        font = QFont("Arial", 20)
-        painter.setFont(font)
-        text_rect = QRectF(0, 0, size, size)
-        painter.drawText(text_rect, Qt.AlignCenter, text)
+        painter.setFont(QFont("Arial", 20))
+        painter.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, text)
         painter.end()
 
         return QPixmap.fromImage(image)
 
-    def setup_images(self):
-        """
-        Adds dummy images to the scene at fixed coordinates.
-        The (0,0) coordinate is the center of your scene.
-        """
-        # Example images at different fixed coordinates
-        # Image 1: At (0, 0) - the center of the coordinate space
-        pixmap1 = self.generate_dummy_image(150, "Image 1 (0,0)", QColor(255, 180, 180))
-        item1 = QGraphicsPixmapItem(pixmap1)
-        item1.setPos(-pixmap1.width() / 2, -pixmap1.height() / 2) # Center the image at (0,0)
-        self.scene.addItem(item1)
-
-        # Image 2: At (500, 200)
-        pixmap2 = self.generate_dummy_image(200, "Image 2 (500,200)", QColor(180, 255, 180))
-        item2 = QGraphicsPixmapItem(pixmap2)
-        item2.setPos(500, 200)
-        self.scene.addItem(item2)
-
-        # Image 3: At (-300, 400)
-        pixmap3 = self.generate_dummy_image(100, "Image 3 (-300,400)", QColor(180, 180, 255))
-        item3 = QGraphicsPixmapItem(pixmap3)
-        item3.setPos(-300, 400)
-        self.scene.addItem(item3)
-
-        # Image 4: At (700, -500)
-        pixmap4 = self.generate_dummy_image(180, "Image 4 (700,-500)", QColor(255, 255, 180))
-        item4 = QGraphicsPixmapItem(pixmap4)
-        item4.setPos(700, -500)
-        self.scene.addItem(item4)
-
-        # Image 5: At (-800, -100)
-        pixmap5 = self.generate_dummy_image(120, "Image 5 (-800,-100)", QColor(255, 180, 255))
-        item5 = QGraphicsPixmapItem(pixmap5)
-        item5.setPos(-800, -100)
-        self.scene.addItem(item5)
-
-        print(f"Added {len(self.scene.items())} images to the scene.")
-        print("Scene origin (0,0) is in the center of the initial view.")
-        print("Use left mouse button to drag/pan, mouse wheel to zoom.")
-
-    def render(self, size, x, y, name, h = 10, s = 255, l = 128):
+    def add_to_scene(self, size, x, y, name, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
         color = QColor()
         color.setHsl(int(h), int(s), int(l), alpha=255)
-        # pixmap = self.generate_dummy_image(size, f"{name} ({x},{y})", color)
-        pixmap = self.generate_dummy_image(size, f"", color)
+        pixmap = self.generate_dummy_image(size, f"{name}", color)
         item = QGraphicsPixmapItem(pixmap)
-        
+
+        # center image on position
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
-        # print(f"rendered: {name} ({x},{y})")
+        
+        base_speed = 5  # degrees per frame
 
-    def hex_spiral(self, images):
-        sq = 256
-        # self.render(sq, images[0][0], last_pos[0], last_pos[1])
-        self.render(sq, 0, 0, 0)
-        level = 0
+        # direction: (1 = clockwise, -1 = counterclockwise)
+        w = base_speed * direction # angular velocity
+        
+        self.image_data.append({
+            'item': item,
+            'r': r,
+            'th_0': initial_angle,
+            'w': w,
+        })
+
+    def update_animation(self):
+        self.animation_time += 0.016 # 60 FPS
+        
+        for data in self.image_data:
+            item = data['item']
+            r = data['r']
+            th_0 = data['th_0']
+            w = data['w']
+            if w != 0:
+                th = th_0 + (w * self.animation_time) # new angle (degrees)
+                
+                th = th * (2 * np.pi / 360)
+                new_x = r * np.cos(th) * self.STD_SPACE
+                new_y = r * np.sin(th) * self.STD_SPACE
+                
+                # center image on position
+                pixmap = item.pixmap()
+                item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
+
+    def circles(self, images):
+        # center image is added within loop
+        r = 0
+        # ths is the thetas (angles) for each image in a ring
+        # defined better at end of loop body
+        ths = np.array([0])
+        
+        for i, image in enumerate(images):
+            # "pop" the first element/angle to put image on
+            th = ths[0] % 360
+            ths = np.delete(ths, 0)
+
+            x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
+            y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
+
+            self.add_to_scene(size=self.STD_SIZE, x=x, y=y, name=image, h=th, r=r, initial_angle=th, 
+                        direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
+            QApplication.processEvents()
+            
+            # when the angles in the ring run out, we finished the ring and start on a higher one
+            if len(ths) == 0:
+                r += 1
+                # number of images in ring
+                n = (8 * r + (r % 2) - 1 - random.randint(0, r * 2))
+                step = 360 / n
+                # offset the angle of the first image in ring, so there isn't just a line of images at th = 0
+                # offset = step**2 # alternative offset
+                # offset = random.randint(0, 359) # alternative offset
+                offset = i * 10 # I just the way this offset looks
+                ths = np.arange(0 + offset, 360 + offset, step)
+                # shuffle if you want expanding rings instead of spiralling rings
+                np.random.shuffle(ths)
+
+    def hexagons(self, images):
+        
+        # center image @ (0, 0)
+        self.add_to_scene(self.STD_SIZE, 0, 0, 0)
+
+        # level aka ring
+        # calculate how many levels there are based on num images
+        # derived from N rings = 1 + 6 * sum(1 to N) = 1 + 3 * N * (N + 1)
+        # more info at https://www.redblobgames.com/grids/hexagons/#rings
         for level in range(1, int(np.ceil((-3 + np.sqrt(12 * len(images) - 3)) / 6) + 1)):
+
+            # sides holds the positions of images in a side and ring
+            # there are level number of images in each side
+            # (level = 2) ex: 
+            # sides = [[1,2], [3,4], [5,6], [7,8], [9,10], [11,12]] 
+            # [3,4] is the first and second image in the top right side/diagonal
+            # further logic is in later code
             sides = []
             for c in range(0, 6):
                 sides.append(list(range((c * level) + 1, ((c+1) * level) + 1)))
 
-            # print(sides)
-            print(f"level {level}")
-            h = 0
-
+            # index start at sum of images in previous rings
             start = (level - 1) * level * 3 + 1
+            # index end, add number of images in current ring (6 * level) (or end of images in the case of partially filled ring) from start
             end = min(start + level * 6, len(images))
+
             for i, image in enumerate(images[start : end]):
+
+                # shuffle sides once a image has been placed in every side
                 if i % 6 == 0:
                     random.shuffle(sides)
-                    # pass
 
+                # randomly pick a position in the side and remove so no duplicate positions
                 idx = random.randint(0, len(sides[i % 6]) - 1)
-                # idx = 0
                 place = sides[i % 6].pop(idx)
 
-
-                placem = place % level
                 x, y = 0, 0
-                if place <= level: # tr diagonal
-                    x = (level * sq) - ((place - 1) * (sq / 2))
-                    y = -(place - 1) * sq
-                elif place <= level * 2: # t line
-                    x = level * sq/2 - (place - level - 1) * sq
-                    y = -level * sq
-                elif place <= level * 3: # tl diagonal
-                    x = -(level * sq/2) - ((place - (level * 2) - 1)) * (sq / 2)
-                    y = -level * sq + (place - (level * 2) - 1) * sq
-                elif place <= level * 4: # bl diagonal
-                    x = -level * sq + (place - (level * 3) - 1) * sq/2
-                    y = (place - (level * 3) - 1) * sq
-                elif place <= level * 5: # b line
-                    x = -level * sq / 2 + (place - (level * 4) - 1) * sq
-                    y = level * sq
-                elif place <= level * 6: # br diagonal
-                    x = level * sq/2 + (place - (level * 5) - 1) * sq/2
-                    y = level * sq - (place - (level * 5) - 1) * sq
 
-                h = place / (level * 6) * 359
+                # ngl ik this code is so ugly and there's prob a more elegant solution but this works
+                # images are placed in lines corresponding to each side of the hexagonal ring
+                # (top right, top, top left, bottom left, bottom, bottom right)
+                if place <= level: # tr
+                    x = (level * self.STD_SPACE) - ((place - 1) * (self.STD_SPACE / 2))
+                    y = -(place - 1) * self.STD_SPACE
+                elif place <= level * 2: # t
+                    x = level * self.STD_SPACE/2 - (place - level - 1) * self.STD_SPACE
+                    y = -level * self.STD_SPACE
+                elif place <= level * 3: # tl
+                    x = -(level * self.STD_SPACE/2) - ((place - (level * 2) - 1)) * (self.STD_SPACE / 2)
+                    y = -level * self.STD_SPACE + (place - (level * 2) - 1) * self.STD_SPACE
+                elif place <= level * 4: # bl
+                    x = -level * self.STD_SPACE + (place - (level * 3) - 1) * self.STD_SPACE/2
+                    y = (place - (level * 3) - 1) * self.STD_SPACE
+                elif place <= level * 5: # b
+                    x = -level * self.STD_SPACE / 2 + (place - (level * 4) - 1) * self.STD_SPACE
+                    y = level * self.STD_SPACE
+                elif place <= level * 6: # br
+                    x = level * self.STD_SPACE/2 + (place - (level * 5) - 1) * self.STD_SPACE/2
+                    y = level * self.STD_SPACE - (place - (level * 5) - 1) * self.STD_SPACE
 
-                # h %= 360
+                # calculate actual radius (different from level)
+                # for hexagons the distance from origin is different than level
+                # if you use level as radius, you'll get a fixed distance and circular rings (kinda cool but not desired here)
+                radius = math.sqrt(x**2 + y**2) / self.STD_SPACE
+                
+                # calculate the actual angle the image is at
+                th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
 
-                self.render(size=sq, x=x, y=y, name=image, h= h)
+                self.add_to_scene(size=self.STD_SIZE, x=x, y=y, name=image, h=th, 
+                           r=radius, initial_angle=th, direction= 1)
                 
                 QApplication.processEvents()
-                # time.sleep(0.003)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
-    window.hex_spiral(np.arange(0, 102700))
+    
+    # Choose which layout to use:
+    window.hexagons(np.arange(0, 500))  # Hexagonal spiral with rotation
+    # window.circles(np.arange(0, 200))     # Circular layout with rotation
+    
     sys.exit(app.exec_())
-
