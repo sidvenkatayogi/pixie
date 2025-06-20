@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
 import time
-import math
 
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
@@ -93,8 +92,9 @@ class ImageGalleryApp(QMainWindow):
         self.scene = QGraphicsScene()
         self.view = CustomGraphicsView(self.scene)
 
-        self.image_data = []
-        self.STD_SIZE = 256
+        # self.image_data = []
+        self.image_data = {}
+        self.STD_SIZE = 512
         self.STD_SPACE = self.STD_SIZE * 1.85
         
         self.animation_timer = QTimer()
@@ -130,23 +130,20 @@ class ImageGalleryApp(QMainWindow):
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
         
-        base_speed = 5  # degrees per frame
+        base_speed = 1000  # degrees per frame
 
         # direction: (1 = clockwise, -1 = counterclockwise)
-        w = base_speed * direction # angular velocity
+        w = base_speed * direction / (r + 1)# angular velocity
         
-        self.image_data.append({
-            'item': item,
-            'r': r,
-            'th_0': initial_angle,
-            'w': w,
-        })
+        self.image_data[item] = {'r': r,
+                             'th_0': initial_angle,
+                             'w': w,}
 
     def update_animation(self):
         self.animation_time += 0.016 # 60 FPS
         
-        for data in self.image_data:
-            item = data['item']
+        for item, data in self.image_data.items():
+            # item = data['item']
             r = data['r']
             th_0 = data['th_0']
             w = data['w']
@@ -160,6 +157,7 @@ class ImageGalleryApp(QMainWindow):
                 # center image on position
                 pixmap = item.pixmap()
                 item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
+            self.image_data[item]['w'] *= 0.96
 
     def circles(self, images):
         # center image is added within loop
@@ -257,7 +255,7 @@ class ImageGalleryApp(QMainWindow):
                 # calculate actual radius (different from level)
                 # for hexagons the distance from origin is different than level
                 # if you use level as radius, you'll get a fixed distance and circular rings (kinda cool but not desired here)
-                radius = math.sqrt(x**2 + y**2) / self.STD_SPACE
+                radius = np.sqrt(x**2 + y**2) / self.STD_SPACE
                 
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
@@ -272,9 +270,11 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
-    
     # Choose which layout to use:
-    window.hexagons(np.arange(0, 500))  # Hexagonal spiral with rotation
+    # window.hexagons(np.arange(0, 500))f  # Hexagonal spiral with rotation
+    while window.animation_time < 3:
+        app.processEvents()
+    print("out")
     # window.circles(np.arange(0, 200))     # Circular layout with rotation
-    
+    window.hexagons(np.arange(0, 300))  # Hexagonal spiral with rotation
     sys.exit(app.exec_())
