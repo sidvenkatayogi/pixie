@@ -9,8 +9,13 @@ from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
 import time
 
 from search_color import search
+from add_color import add
+
 from PIL import Image
 from PIL.ImageQt import ImageQt # only works for PyQt6
+
+from tqdm import tqdm
+
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
@@ -98,8 +103,8 @@ class ImageGalleryApp(QMainWindow):
 
         # self.image_data = []
         self.image_data = {}
-        self.STD_SIZE = 1024
-        self.STD_SPACE = self.STD_SIZE * 1.75
+        self.STD_SIZE = 256
+        self.STD_SPACE = self.STD_SIZE * 1.5
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
@@ -294,6 +299,11 @@ class ImageGalleryApp(QMainWindow):
 
 
 if __name__ == "__main__":
+    # start_time = time.time()
+    # add(dir= r"gallery-dl\pinterest\sidvenkatayogii\Reference", name= "pinterest")
+    # end_time = time.time()
+    # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
+
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
@@ -302,45 +312,59 @@ if __name__ == "__main__":
     print("out")
     # window.circles(np.arange(0, 300))
     # window.hexagons(np.arange(0, 300))
-
-    images = search(rgb= (204, 12, 12))
+    start_time = time.time()
+    
+    images = search("pinterest", rgb= (204, 12, 100), k = 500)
 
     # creates PyQt6 QImage
     # imgqt = ImageQt(images[0])
     # qimage = imgqt.copy()
-
+    # for i in images[1:]:
+    #     print(i[1])
     pixmaps = []
-    for i, image in enumerate(images):
-        if i != 0:
+    # i = 0
+    # for i, image in enumerate(images):
+    images[0] = [images[0], 0]
+    for image in tqdm(images):
+        if image[1] > 13 or image[1] == 0:
+            # if i != 0:
+            #     image = image[0]
+            # else:
+            #     i += 1
             image = image[0]
-        width, height = image.size
 
-        data = image.tobytes("raw", "RGB")
-        qimage = QImage(data, width, height, width * 3, QImage.Format_RGB888)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
 
-        pixmap = QPixmap.fromImage(qimage)
+            width, height = image.size
 
-        h = pixmap.height()
-        w = pixmap.width()
+            data = image.tobytes("raw", "RGB")
+            qimage = QImage(data, width, height, width * 3, QImage.Format_RGB888)
 
-        ar = w/h
+            pixmap = QPixmap.fromImage(qimage)
 
-        if max(h, w) == h:
-            pixmap = pixmap.scaled(int(window.STD_SIZE * ar), window.STD_SIZE,
-                                #    aspectRatioMode = Qt.KeepAspectRatio,
-                                   transformMode= Qt.SmoothTransformation
-                                   )
-        else:
-            pixmap = pixmap.scaled(window.STD_SIZE, int(window.STD_SIZE / ar),
-                                #    aspectRatioMode = Qt.KeepAspectRatio,
-                                   transformMode= Qt.SmoothTransformation
-                                   )
+            h = pixmap.height()
+            w = pixmap.width()
 
-        pixmaps.append(pixmap)
+            ar = w/h
 
-    
+            if max(h, w) == h:
+                pixmap = pixmap.scaled(int(window.STD_SIZE * ar), window.STD_SIZE,
+                                    #    aspectRatioMode = Qt.KeepAspectRatio,
+                                    transformMode= Qt.SmoothTransformation
+                                    )
+            else:
+                pixmap = pixmap.scaled(window.STD_SIZE, int(window.STD_SIZE / ar),
+                                    #    aspectRatioMode = Qt.KeepAspectRatio,
+                                    transformMode= Qt.SmoothTransformation
+                                    )
+
+            pixmaps.append(pixmap)
 
     window.hexagons(pixmaps)
+
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time:.3f} seconds")
     # window.circles(pixmaps)
     sys.exit(app.exec_())
 

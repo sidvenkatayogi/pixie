@@ -2,6 +2,9 @@
 *.png
 *.jpg
 *.jpeg
+*.webp
+*.gif
+*.m4v
 chroma/
 __pycache__/
 *.json

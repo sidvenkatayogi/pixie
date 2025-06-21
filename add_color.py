@@ -6,27 +6,35 @@ from imagehash import colorhash
 from hashDB import HashDB
 from vectorDB import VectorDB
 import time
+from tqdm import tqdm
 
+def add(dir, name):
+    db = VectorDB(name= name)
+    explore = False
+    image_paths = []
+    for file in tqdm(os.listdir(dir), desc= f"Exploring... ({dir})", disable= not explore):
+        # print(folder_path)
+        file_path = os.path.join(dir, file)
+        if os.path.isfile(file_path) and file.lower().endswith((".png", ".jpg", ".jpeg")):
+            image_paths.append(file_path)
 
-def add(dir, db):
-    for f in os.listdir(dir):
-        path = os.path.join(dir, f)
-        if os.path.isdir(path):
-            add(path, db)
-        else:
+    for path in tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB... ({dir})"):
+        try:
             if type(db) == VectorDB:
-                cols = c.get_dominant_colors(Image.open(path), num_colors= 3)
+                cols = c.get_dominant_colors(Image.open(path, mode= "r"), num_colors= 3)
                 db.add_vector(id= path,vec= cols)
             elif type(db) == HashDB:
                 hash = colorhash(Image.open(path), binbits = 7)
                 db.add_hash(path, hash)
+        except Exception as e:
+            print(f"error with {path} : {e}")
+    db.save_DB()
 
 
-dir = "images"
 
-db = VectorDB(name= "colors")
-# db = HashDB()
+if __name__ == "__main__":
+    dir = r"gallery-dl\pinterest\sidvenkatayogii\Reference"
 
-add(dir, db)
+    # db = HashDB()
 
-db.save_DB()
+    add(dir, "pinterest")

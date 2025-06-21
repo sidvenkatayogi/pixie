@@ -9,7 +9,7 @@ import time
 
 regex = r"\((\d+),\s+(\d+),\s+(\d+)\)"
 
-def search(rgb= None, path= None, k = None):
+def search(name, rgb= None, path= None, k = None):
     query = None
     query_image = None
     if rgb and len(rgb) == 3:
@@ -21,7 +21,7 @@ def search(rgb= None, path= None, k = None):
     else:
         raise Exception("Enter RGB values or image path")
 
-    db = VectorDB.get_DB(name= "colors")
+    db = VectorDB.get_DB(name= name)
 
     images = None
     if k == None:
