@@ -67,6 +67,9 @@ class VectorDB:
             distance = colors.multidist(vec, vec2)
             self.vector_index[id2][id] = distance
 
+    def __len__(self):
+        return len(self.vector_data)
+
     def knn(self, query, k = 5):
         results = []
         # print(self.vector_data.items())

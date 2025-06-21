@@ -1,6 +1,8 @@
-sides = []
-level = 2
-for c in range(0, 6):
-    sides.append(list(range((c * level) + 1, ((c+1) * level) + 1)))
+from search_color import search
+from PIL import Image
 
-print(sides)
+imgs = search(query = (204, 12, 12))
+
+paths = [i[0] for i in imgs]
+
+print(paths)

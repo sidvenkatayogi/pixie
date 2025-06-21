@@ -8,6 +8,9 @@ from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
 import time
 
+from search_color import search
+from PIL import Image
+
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
@@ -22,6 +25,7 @@ class CustomGraphicsView(QGraphicsView):
         self.panning = False
         self.last_pos = QPointF()
 
+        self.scene().setSceneRect(-2000*5, -2000*5, 4000*5, 4000*5)
         self.centerOn(0, 0)
 
     # start panning
@@ -94,8 +98,8 @@ class ImageGalleryApp(QMainWindow):
 
         # self.image_data = []
         self.image_data = {}
-        self.STD_SIZE = 512
-        self.STD_SPACE = self.STD_SIZE * 1.85
+        self.STD_SIZE = 1024
+        self.STD_SPACE = self.STD_SIZE * 1.75
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
@@ -108,7 +112,7 @@ class ImageGalleryApp(QMainWindow):
         layout.addWidget(self.view)
         self.setCentralWidget(central_widget)
 
-    def generate_dummy_image(self, size, text, color):
+    def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)
         image.fill(color)
 
@@ -120,10 +124,30 @@ class ImageGalleryApp(QMainWindow):
 
         return QPixmap.fromImage(image)
 
-    def add_to_scene(self, size, x, y, name, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
-        color = QColor()
-        color.setHsl(int(h), int(s), int(l), alpha=255)
-        pixmap = self.generate_dummy_image(size, f"{name}", color)
+    def add_to_scene(self, x, y, image, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
+        pixmap = None
+        if type(image) == tuple and len(image) == 3:
+            color = QColor(image[0], image[1], image[2])
+            pixmap = self.generate_dummy_image(self.STD_SIZE, color)
+        elif type(image) == str:
+            pixmap = QPixmap(image)
+        else:
+            raise Exception("Enter RGB values as tuple (R, G, B) or image path")
+
+        h = pixmap.height()
+        w = pixmap.width()
+        ar = w/h
+        if max(h, w) == h:
+            pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,
+                                #    aspectRatioMode = Qt.KeepAspectRatio,
+                                   transformMode= Qt.SmoothTransformation
+                                   )
+        else:
+            pixmap = pixmap.scaled(self.STD_SIZE, int(self.STD_SIZE / ar),
+                                #    aspectRatioMode = Qt.KeepAspectRatio,
+                                   transformMode= Qt.SmoothTransformation
+                                   )
+        
         item = QGraphicsPixmapItem(pixmap)
 
         # center image on position
@@ -148,7 +172,9 @@ class ImageGalleryApp(QMainWindow):
             th_0 = data['th_0']
             w = data['w']
             if w != 0:
-                th = th_0 + (w * self.animation_time) # new angle (degrees)
+
+                # th = th_0 + w * self.animation_time # new angle (degrees)
+                th = th_0 + w # reverse to initial position
                 
                 th = th * (2 * np.pi / 360)
                 new_x = r * np.cos(th) * self.STD_SPACE
@@ -157,7 +183,7 @@ class ImageGalleryApp(QMainWindow):
                 # center image on position
                 pixmap = item.pixmap()
                 item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
-            self.image_data[item]['w'] *= 0.96
+            self.image_data[item]['w'] *= 0.96 # reverse to initial position
 
     def circles(self, images):
         # center image is added within loop
@@ -174,7 +200,14 @@ class ImageGalleryApp(QMainWindow):
             x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
             y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
 
-            self.add_to_scene(size=self.STD_SIZE, x=x, y=y, name=image, h=th, r=r, initial_angle=th, 
+            img = None
+            if i == 0:
+                img = image
+
+            else:
+                img = image[0]
+
+            self.add_to_scene(x=x, y=y, image=img, h=th, r=r, initial_angle=th, 
                         direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
             QApplication.processEvents()
             
@@ -193,9 +226,8 @@ class ImageGalleryApp(QMainWindow):
                 np.random.shuffle(ths)
 
     def hexagons(self, images):
-        
         # center image @ (0, 0)
-        self.add_to_scene(self.STD_SIZE, 0, 0, 0)
+        self.add_to_scene(x= 0, y= 0, image= images[0])
 
         # level aka ring
         # calculate how many levels there are based on num images
@@ -259,22 +291,24 @@ class ImageGalleryApp(QMainWindow):
                 
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
-
-                self.add_to_scene(size=self.STD_SIZE, x=x, y=y, name=image, h=th, 
+                if type(image) != Image:
+                    image = image[0]
+                self.add_to_scene(x=x, y=y, image=image[0], h=th, 
                            r=radius, initial_angle=th, direction= 1)
                 
-                QApplication.processEvents()
+                # QApplication.processEvents()
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
-    # Choose which layout to use:
-    # window.hexagons(np.arange(0, 500))f  # Hexagonal spiral with rotation
     while window.animation_time < 3:
         app.processEvents()
     print("out")
-    # window.circles(np.arange(0, 200))     # Circular layout with rotation
-    window.hexagons(np.arange(0, 300))  # Hexagonal spiral with rotation
+    # window.circles(np.arange(0, 300))
+    # window.hexagons(np.arange(0, 300))
+    images = search(rgb= (204, 12, 12))
+    window.circles(images)
     sys.exit(app.exec_())
+
