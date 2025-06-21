@@ -1,15 +1,21 @@
+# TODO tweak the multidist function bc rn its considering a lot of white (and some black) images to be similar but its actually not
+# itll be easier now that I can visually see what's happening
+
 import sys
 import os
 import numpy as np
 import random
+import colorsys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
                              QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QWidget)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
 import time
 
-from search_color import search
-from add_color import add
+# from search_color import search
+# from add_color import add
+from accessDBs import add_color, search_color, add_content, search_content
+from colors import get_dominant_colors
 
 from PIL import Image
 from PIL.ImageQt import ImageQt # only works for PyQt6
@@ -30,7 +36,7 @@ class CustomGraphicsView(QGraphicsView):
         self.panning = False
         self.last_pos = QPointF()
 
-        self.scene().setSceneRect(-2000*5, -2000*5, 4000*5, 4000*5)
+        self.scene().setSceneRect(-2000*10, -2000*10, 4000*10, 4000*10)
         self.centerOn(0, 0)
 
     # start panning
@@ -104,11 +110,13 @@ class ImageGalleryApp(QMainWindow):
         # self.image_data = []
         self.image_data = {}
         self.STD_SIZE = 256
-        self.STD_SPACE = self.STD_SIZE * 1.5
+        self.STD_SPACE = self.STD_SIZE * 1.25
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
-        self.animation_timer.start(16)  # ~60 FPS (16ms intervals)
+        self.FPS = 48
+        
+        self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
         
         self.animation_time = 0.0
 
@@ -163,7 +171,7 @@ class ImageGalleryApp(QMainWindow):
                              'w': w,}
 
     def update_animation(self):
-        self.animation_time += 0.016 # 60 FPS
+        self.animation_time += (int(1/self.FPS * 1000) / 1000) # 60 FPS
         
         for item, data in self.image_data.items():
             # item = data['item']
@@ -223,6 +231,62 @@ class ImageGalleryApp(QMainWindow):
                 ths = np.arange(0 + offset, 360 + offset, step)
                 # shuffle if you want expanding rings instead of spiralling rings
                 np.random.shuffle(ths)
+
+    # makes circular rings, but tries to order images in rings by hue
+    def circlesh(self, images):
+        # center image is added within loop
+        r = 0
+        # number of images in ring
+        n = 1
+        total = 0
+        images = list(images)
+
+        # ths is the thetas (angles) for each image in a ring
+        # defined better at end of loop body
+        ths = np.array([0])
+        
+        # every iteration of this loop is a new ring
+        # this structure is because n is random and different for each ring
+        while len(images) > 0:
+            # list of images in the current ring
+            imgs = []
+            for i in range(n):
+                total += 1
+                if len(images) > 0:
+                    imgs.append(images.pop(0))
+
+            # sort by hue
+            # this doesn't find the absolute best order-
+            # -to minimize the distance from where the image should actually be based on hue (while evenly spacing images)
+            # but it's a simple solution that adds a little structure to the ring order
+            imgs.sort(key= lambda x: x[1])
+
+            for image in imgs:
+                # "pop" the first element/angle to put image on
+                th = ths[0] % 360
+                ths = np.delete(ths, 0)
+                
+                # instead of evenly spacing the images out, you can just use the hue as the angle
+                # this doesn't create a clean circle but will show hue distribution better
+                th = image[1] * 360
+
+                x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
+                y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
+
+                self.add_to_scene(x=x, y=y, image=image[0], h=th, r=r, initial_angle=th, 
+                            direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
+            QApplication.processEvents()
+
+            r += 1
+            # number of images in ring
+            n = (8 * r + (r % 2) - 1 - random.randint(0, r * 2))
+            step = 360 / n
+            # offset the angle of the first image in ring, so there isn't just a line of images at th = 0
+            # offset = step**2 # alternative offset
+            # offset = random.randint(0, 359) # alternative offset
+            offset = total * 10 # I just the way this offset looks
+            ths = np.arange(0 + offset, 360 + offset, step)
+            
 
     def hexagons(self, images):
         # center image @ (0, 0)
@@ -299,8 +363,9 @@ class ImageGalleryApp(QMainWindow):
 
 
 if __name__ == "__main__":
-    # start_time = time.time()
+    start_time = time.time()
     # add(dir= r"gallery-dl\pinterest\sidvenkatayogii\Reference", name= "pinterest")
+    # add_color(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference")
     # end_time = time.time()
     # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
 
@@ -314,8 +379,8 @@ if __name__ == "__main__":
     # window.hexagons(np.arange(0, 300))
     start_time = time.time()
     
-    images = search("pinterest", rgb= (204, 12, 100), k = 500)
-
+    images = search_color("pinterest", rgb= (105, 0, 186), k = 500)
+    
     # creates PyQt6 QImage
     # imgqt = ImageQt(images[0])
     # qimage = imgqt.copy()
@@ -326,16 +391,24 @@ if __name__ == "__main__":
     # for i, image in enumerate(images):
     images[0] = [images[0], 0]
     for image in tqdm(images):
-        if image[1] > 13 or image[1] == 0:
+        # if image[1] > 0 or image[1] == 0:
             # if i != 0:
             #     image = image[0]
             # else:
             #     i += 1
             image = image[0]
 
+            i1 = get_dominant_colors(image)
+            i1 = i1.reshape(int(len(i1)/4), 4)
+            hue = 0
+            for i, rgbf in enumerate(i1):
+                r, g, b = rgbf[:3]
+                hue += colorsys.rgb_to_hsv(r/255, g/255, b/255)[0] * (len(i1) - i)
+            hue /= (len(i1) * (len(i1) + 1))/2
+
             if image.mode != 'RGB':
                 image = image.convert('RGB')
-
+            
             width, height = image.size
 
             data = image.tobytes("raw", "RGB")
@@ -359,12 +432,12 @@ if __name__ == "__main__":
                                     transformMode= Qt.SmoothTransformation
                                     )
 
-            pixmaps.append(pixmap)
+            pixmaps.append((pixmap, hue))
+            # pixmaps.append(pixmap)
 
-    window.hexagons(pixmaps)
+    # window.hexagons(pixmaps)
 
     end_time = time.time()
     print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-    # window.circles(pixmaps)
+    window.circlesh(pixmaps) 
     sys.exit(app.exec_())
-

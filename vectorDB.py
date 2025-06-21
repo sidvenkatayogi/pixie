@@ -44,7 +44,7 @@ class VectorDB:
         """
         self.vector_data[id] = vec
         self.vector_index[id] = {}
-        self.update_index(id, vec)
+        # self.update_index(id, vec)
 
 
     def add_vectors(self, ids, vecs):

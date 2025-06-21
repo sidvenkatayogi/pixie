@@ -39,6 +39,37 @@ def get_dominant_colors(image, palette_size=16, num_colors=5):
     return dominant_colors
 
 
+# https://gist.github.com/earthbound19/e7fe15fdf8ca3ef814750a61bc75b5ce
+def gammaToLinear(x):
+    if x >= 0.04045:
+        return ((x + 0.055)/(1 + 0.055))**2.4
+    else:
+        return x / 12.92
+def rgbToLab(c):
+    r, g, b = c[:3]
+
+    r = gammaToLinear(r / 255)
+    g = gammaToLinear(g / 255)
+    b = gammaToLinear(b / 255)
+
+    #   // This is the Oklab math:
+    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+#   // Math.crb (cube root) here is the equivalent of the C++ cbrtf function here: https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
+    l = np.cbrt(l)
+    m = np.cbrt(m)
+    s = np.cbrt(s)
+
+    return [l * +0.2104542553 + m * +0.7936177850 + s * -0.0040720468,
+            l * +1.9779984951 + m * -2.4285922050 + s * +0.4505937099,
+            l * +0.0259040371 + m * +0.7827717662 + s * -0.8086757660]
+def labdist(c1, c2):
+    l1, a1, b1 = rgbToLab(c1)
+    l2, a2, b2 = rgbToLab(c2)
+
+    return np.sqrt((l1-l2)**2 + (a1-a2)**2 + (b1-b2**2))
+
 # weighted Euclidean distance
 # formula: https://www.compuphase.com/cmetric.htm#:~:text=A%20low%2Dcost%20approximation)
 def dist(c1, c2):
@@ -60,18 +91,18 @@ def dist(c1, c2):
         return np.sqrt(x + y + z) / ((c1f**2)*(c2f**2))
     else:
         return np.sqrt(x + y + z)
-
-
+    
 def multidist(i1, i2, id= None):
     i1 = i1.reshape(int(len(i1)/4), 4)
     i2 = i2.reshape(int(len(i2)/4), 4)
     distance = 0
-
     for i, rgbf1 in enumerate(i1):
         for j, rgbf2 in enumerate(i2):
             f1 = rgbf1[-1]
             f2 = rgbf2[-1]
-            distance += np.log((dist(rgbf1[:3], rgbf2[:3]) / (i + 1) / (j + 1))  + 1)
+            # distance += np.log((dist(rgbf1[:3], rgbf2[:3]) / (i + 1) / (j + 1))  + 1)
+            distance += dist(rgbf1[:3], rgbf2[:3]) / (i + 1)**1.42 / (j + 1)**1.41
+            # distance += dist(rgbf1[:3], rgbf2[:3]) / (i + j + 1)
     return distance
 
 
@@ -96,7 +127,7 @@ def show(path):
 
 
 if __name__ == "__main__":
-    dir = "images/sidvenkatayogi"
+    dir = r"gallery-dl\pinterest\sidvenkatayogii\Reference"
     for p in os.listdir(dir):
         show(os.path.join(dir, p))
         input("ENTER for next image")
