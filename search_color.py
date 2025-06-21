@@ -30,7 +30,11 @@ def search(rgb= None, path= None, k = None):
         images = db.knn(c.get_dominant_colors(query_image, num_colors= 3), k= k)
     elif type(db) == HashDB:
         images = db.knn(colorhash(query_image, binbits = 7), k= k)
-    return [query] + images
+
+    for i, image in enumerate(images):
+        images[i][0] = Image.open(image[0])
+        
+    return [query_image] + images
 
 
 

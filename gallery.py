@@ -10,7 +10,7 @@ import time
 
 from search_color import search
 from PIL import Image
-
+from PIL.ImageQt import ImageQt # only works for PyQt6
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
@@ -124,29 +124,23 @@ class ImageGalleryApp(QMainWindow):
 
         return QPixmap.fromImage(image)
 
-    def add_to_scene(self, x, y, image, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
-        pixmap = None
-        if type(image) == tuple and len(image) == 3:
-            color = QColor(image[0], image[1], image[2])
-            pixmap = self.generate_dummy_image(self.STD_SIZE, color)
-        elif type(image) == str:
-            pixmap = QPixmap(image)
-        else:
-            raise Exception("Enter RGB values as tuple (R, G, B) or image path")
+    def add_to_scene(self, x, y, image : QPixmap, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
+        pixmap = image
 
-        h = pixmap.height()
-        w = pixmap.width()
-        ar = w/h
-        if max(h, w) == h:
-            pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,
-                                #    aspectRatioMode = Qt.KeepAspectRatio,
-                                   transformMode= Qt.SmoothTransformation
-                                   )
-        else:
-            pixmap = pixmap.scaled(self.STD_SIZE, int(self.STD_SIZE / ar),
-                                #    aspectRatioMode = Qt.KeepAspectRatio,
-                                   transformMode= Qt.SmoothTransformation
-                                   )
+        # h = pixmap.height()
+        # w = pixmap.width()
+
+        # ar = w/h
+        # if max(h, w) == h:
+        #     pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,
+        #                         #    aspectRatioMode = Qt.KeepAspectRatio,
+        #                            transformMode= Qt.SmoothTransformation
+        #                            )
+        # else:
+        #     pixmap = pixmap.scaled(self.STD_SIZE, int(self.STD_SIZE / ar),
+        #                         #    aspectRatioMode = Qt.KeepAspectRatio,
+        #                            transformMode= Qt.SmoothTransformation
+        #                            )
         
         item = QGraphicsPixmapItem(pixmap)
 
@@ -200,14 +194,14 @@ class ImageGalleryApp(QMainWindow):
             x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
             y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
 
-            img = None
-            if i == 0:
-                img = image
+            # img = None
+            # if i == 0:
+            #     img = image
 
-            else:
-                img = image[0]
+            # else:
+            #     img = image[0]
 
-            self.add_to_scene(x=x, y=y, image=img, h=th, r=r, initial_angle=th, 
+            self.add_to_scene(x=x, y=y, image=image, h=th, r=r, initial_angle=th, 
                         direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
             QApplication.processEvents()
             
@@ -291,9 +285,9 @@ class ImageGalleryApp(QMainWindow):
                 
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
-                if type(image) != Image:
-                    image = image[0]
-                self.add_to_scene(x=x, y=y, image=image[0], h=th, 
+                # if type(image) != Image:
+                #     image = image[0]
+                self.add_to_scene(x=x, y=y, image=image, h=th, 
                            r=radius, initial_angle=th, direction= 1)
                 
                 # QApplication.processEvents()
@@ -308,7 +302,45 @@ if __name__ == "__main__":
     print("out")
     # window.circles(np.arange(0, 300))
     # window.hexagons(np.arange(0, 300))
+
     images = search(rgb= (204, 12, 12))
-    window.circles(images)
+
+    # creates PyQt6 QImage
+    # imgqt = ImageQt(images[0])
+    # qimage = imgqt.copy()
+
+    pixmaps = []
+    for i, image in enumerate(images):
+        if i != 0:
+            image = image[0]
+        width, height = image.size
+
+        data = image.tobytes("raw", "RGB")
+        qimage = QImage(data, width, height, width * 3, QImage.Format_RGB888)
+
+        pixmap = QPixmap.fromImage(qimage)
+
+        h = pixmap.height()
+        w = pixmap.width()
+
+        ar = w/h
+
+        if max(h, w) == h:
+            pixmap = pixmap.scaled(int(window.STD_SIZE * ar), window.STD_SIZE,
+                                #    aspectRatioMode = Qt.KeepAspectRatio,
+                                   transformMode= Qt.SmoothTransformation
+                                   )
+        else:
+            pixmap = pixmap.scaled(window.STD_SIZE, int(window.STD_SIZE / ar),
+                                #    aspectRatioMode = Qt.KeepAspectRatio,
+                                   transformMode= Qt.SmoothTransformation
+                                   )
+
+        pixmaps.append(pixmap)
+
+    
+
+    window.hexagons(pixmaps)
+    # window.circles(pixmaps)
     sys.exit(app.exec_())
 

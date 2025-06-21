@@ -75,7 +75,7 @@ class VectorDB:
         # print(self.vector_data.items())
         for id, vec in self.vector_data.items():
             distance = colors.multidist(query, vec, id)
-            results.append((id, distance, vec))
+            results.append([id, distance, vec])
         results.sort(key= lambda x: x[1])
         return results[:k]
     
