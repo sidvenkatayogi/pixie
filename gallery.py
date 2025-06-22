@@ -1,6 +1,6 @@
 # TODO 
 # make it auto scale to a good starting view
-# fuck chromadb
+# fuck chromadb, restart with faiss
 
 import sys
 import os
@@ -15,13 +15,13 @@ import time
 
 # from search_color import search
 # from add_color import add
-from accessDBs import add_color, search_color, add_content, search_content
+from accessDBs import add_color, search_color, add_visual, search_visual
 from colors import get_dominant_colors
 
 import PIL
 from PIL import Image
 from PIL.ImageQt import ImageQt # only works for PyQt6
-
+ 
 from tqdm import tqdm
 
 class CustomGraphicsView(QGraphicsView):
@@ -131,9 +131,10 @@ class ImageGalleryApp(QMainWindow):
         pixmaps = []
         
         for image in tqdm(images, desc= "Scaling..."):
-            pixmap = image["pixmap"]
-            if type(image["pixmap"]) == PIL.Image:
-                image = image["pixmap"]
+            pixmap = image.get("pixmap")
+
+            if image.get("image") == Image:
+                image = image["image"]
                 if image.mode != 'RGB':
                     image = image.convert('RGB')
                     
@@ -152,6 +153,9 @@ class ImageGalleryApp(QMainWindow):
 
                 pixmap = QPixmap.fromImage(qimage)
             else:
+                if isinstance(image.get("path"), str):
+                    pixmap = QPixmap(image["path"])
+
                 h = pixmap.height()
                 w = pixmap.width()
 
@@ -437,24 +441,22 @@ if __name__ == "__main__":
     # window.animation_timer.stop()
     
     start_time = time.time()
-    
-    images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
+    # images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
     # images = search_content("pinterest", query_image_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 5)
-    # images = search_content("pinterest", query_text= "water", k = 5)
-    
+    images = search_visual("pinterest", file_path= r"images\alariko\C8wimbaqyU5.jpg", k = 300)
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time:.3f} seconds")
     # creates PyQt6 QImage
     # imgqt = ImageQt(images[0])
     # qimage = imgqt.copy()
     # for i in images[1:]:
     #     print(i[1])
 
-    pixmaps = []
 
-    end_time = time.time()
-    print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-    # window.circles(images)
-    print("done")
-    window.hexagons(images)
-    # window.circles(np.arange(0, 300))
-    # window.hexagons(np.arange(0, 300))
+
+    window.circles(images)
+    # print("done")
+    # window.hexagons(images)
+    # # window.circles(np.arange(0, 300))
+    # # window.hexagons(np.arange(0, 300))
     sys.exit(app.exec_())

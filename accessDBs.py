@@ -5,28 +5,30 @@ from chromadb.utils.data_loaders import ImageLoader
 import numpy as np
 from tqdm import tqdm
 import torch
+import torchvision.transforms as tfms
 import os
 from imagehash import colorhash
 from vectorDB import VectorDB
 from hashDB import HashDB
 from colors import get_dominant_colors
 import torch
-from PyQt5.QtGui import QPixmap, QImage
-# db_path = ""
+import faiss
+import json
+import time
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-client = None
-emb_fn = None
+# Load the pre-trained ViT model
+dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def imageToQPixmap(image : Image):
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
-        
-    w, h = image.size
+# Define preprocessing pipeline for images
+transform = tfms.Compose([
+    # tfms.Resize(224, 224),
+    # tfms.CenterCrop(224),
+    tfms.ToTensor(),
+    tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
-    data = image.tobytes("raw", "RGB")
-    qimage = QImage(data, w, h, w * 3, QImage.Format_RGB888)
-
-    return QPixmap.fromImage(qimage)
 
 def get_files(folder_path, explore = False):
     image_paths = []
@@ -40,31 +42,42 @@ def get_files(folder_path, explore = False):
 
     return image_paths
 
-
-def add_content(name, folder_path, explore= False):
+def add_visual(name, folder_path, explore= False, batch_size= 64):
     image_paths = []
     image_paths = get_files(folder_path, explore)
+    all_embeddings = []
+    current_batch_images = []
+    current_batch_paths = []
 
-    client = chromadb.PersistentClient()
-    emb_fn = OpenCLIPEmbeddingFunction(model_name= "ViT-B-32",
-                                   checkpoint= "laion2b_s34b_b79k",
-                                #    device= "cuda" if torch.cuda.is_available() else "cpu")
-                                   device= "cpu")
+    for i, path in enumerate(tqdm(image_paths, desc= "Creating Embeddings...")):
+            image = Image.open(path).convert("RGB").resize((224, 224))
+            transformed_image = transform(image)
+            current_batch_images.append(transformed_image)
+            current_batch_paths.append(path)
+            if len(current_batch_images) == batch_size or i == len(image_paths) - 1:
+                batch_tensor = torch.stack(current_batch_images).to(device)
+                with torch.no_grad():
+                    embeddings_batch = dino(batch_tensor)
+                all_embeddings.append(embeddings_batch.cpu())
+
+                current_batch_images = []
+                current_batch_paths = []
+
     
-    collection = client.get_or_create_collection(name= name,
-                                                embedding_function= emb_fn,
-                                                data_loader= ImageLoader())
-    print("hi")
-    if (len(image_paths) > 0):
-        for path in tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB..."):
-            image = np.array(Image.open(path))
-            collection.add(
-                ids= [path],
-                images= [image]
-            )
-            # print(path)
-    print("bye")
-            
+    vectors = torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
+
+    d = len(vectors[0])
+    index = faiss.IndexFlatIP(d)
+    index = faiss.IndexIDMap(index)
+
+    # Ensure unique IDs for each vector, matching original image_paths order
+    ids = np.array(range(len(image_paths)))
+    index.add_with_ids(vectors, ids)
+
+    faiss.write_index(index, f"database/{name}.index")
+    with open(f"database/{name}_paths.json", "w") as f:
+        json.dump(image_paths, f)
+
 
 
 def add_color(name, folder_path, explore= False):
@@ -91,49 +104,52 @@ def add_color(name, folder_path, explore= False):
     db.save_DB()
 
 
-def search_content(name, query_text= None, query_image= None, query_image_path= None, k = 5):
-    client = chromadb.PersistentClient()
-    collection = client.get_or_create_collection(name= name,)
-                                                # embedding_function= emb_fn,
-                                                # data_loader= ImageLoader())
+def search_visual(name, file_path, k = -1):
+    start_time = time.time()
+    index = faiss.read_index(f"database/{name}.index")
+    end_time = time.time()
+    print(f"Loading time: {end_time - start_time:.3f} seconds")
+
+    if k == -1:
+        k = index.ntotal
+
+    query_image = Image.open(file_path).convert("RGB").resize((224, 224))
+    query_tensor = transform(query_image).unsqueeze(0).to(device)
     
+    start_time = time.time()
+    with torch.no_grad():
+        query_embedding = dino(query_tensor).cpu().numpy()
+    end_time = time.time()
+    print(f"embeddding time: {end_time - start_time:.3f} seconds")
+    
+    start_time = time.time()
+    distances, indices = index.search(query_embedding, k)
+    end_time = time.time()
+    print(f"search time: {end_time - start_time:.3f} seconds")
+    indices = indices[0]
+    distances = distances[0]
+    # Load the original image paths to map back to filenames
+    with open(os.path.join("database", f"{name}_paths.json"), "r") as f:
+        image_paths = json.load(f)
+        
     results = []
-    print(f"Collection '{name}' count: {collection.count()}")
-    if query_image:
-        results = collection.query(query_images=[query_image], n_results= k, include= ["distances"])
-    elif query_text:
-        results = collection.query(query_texts=[query_text], n_results= k, include= ["distances"])
-    elif query_image_path:
-        results = collection.query(query_images=[np.array(Image.open(query_image_path, mode= "r"))], n_results= k, include= ["distances"])
-    else:
-        raise Exception("Enter a text query, PIL Image, or image path")
-    
-    images = [[] * k]
-    print(results)
-    for i, r in enumerate(results["ids"]):
-        query_pixmap = imageToQPixmap(Image.open(r, mode="r"))
-        images[i]["pixmap"] = query_pixmap
-        images[i]["path"] = r
+    for i in range(len(indices)):
+        results.append({"path": image_paths[i], "distance": distances[i]})
 
-    for i, d in enumerate(results["distances"]):
-        images[i]["distance"] = d
-
-    return images
+    results.sort(key= lambda x: x["distance"])
+    return results
 
 
-def search_color(name, rgb= None, image= None, path= None, k = 5):
+def search_color(name, rgb= None, path= None, k = 5):
     query_image = None
-    query_pixmap = None
+    # query_pixmap = None
 
     if rgb and len(rgb) == 3:
         query_image = Image.new('RGB', (10, 10), rgb)
-        query_pixmap = imageToQPixmap(query_image)
-    elif image:
-        query_image = image
-        query_pixmap = imageToQPixmap(query_image)
+        # query_pixmap = imageToQPixmap(query_image)
     elif path:
         query_image = Image.open(path, mode= "r")
-        query_pixmap = QPixmap(path)
+        # query_pixmap = QPixmap(path)
     else:
         raise Exception("Enter RGB values ((R, G, B)), PIL Image, or image path (str)")
 
@@ -150,12 +166,16 @@ def search_color(name, rgb= None, image= None, path= None, k = 5):
     elif type(db) == HashDB:
         images = db.knn(colorhash(query_image, binbits = 7), k= k)
 
-    for i, image in enumerate(tqdm(images, desc= "Loading Pixmaps...")):
+    for i, image in enumerate(images):
         # images[i][0] = Image.open(image[0])
-        images[i]["pixmap"] = QPixmap(image["path"])
+        images[i]["path"] = image["path"]
 
-        
-    return [{"pixmap": query_pixmap, "distance": 0, "colors": vec}] + images
+    if path:
+        return [{"path": path, "distance": 0, "colors": vec}] + images
+    else:
+        return [{"image": query_image, "distance": 0, "colors": vec}] + images
 
 if __name__ == "__main__":
-    print(search_content(name= "pinterest", query_text= "water"))
+    pass
+    # add_visual(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference")
+    # print(search_visual(name="pinterest", file_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773727505082.jpg"))
