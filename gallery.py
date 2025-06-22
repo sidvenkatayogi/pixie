@@ -1,5 +1,6 @@
-# TODO tweak the multidist function bc rn its considering a lot of white (and some black) images to be similar but its actually not
-# itll be easier now that I can visually see what's happening
+# TODO 
+# make it auto scale to a good starting view
+# fuck chromadb
 
 import sys
 import os
@@ -17,6 +18,7 @@ import time
 from accessDBs import add_color, search_color, add_content, search_content
 from colors import get_dominant_colors
 
+import PIL
 from PIL import Image
 from PIL.ImageQt import ImageQt # only works for PyQt6
 
@@ -109,14 +111,14 @@ class ImageGalleryApp(QMainWindow):
 
         # self.image_data = []
         self.image_data = {}
-        self.STD_SIZE = 256
+        self.STD_SIZE = 512
         self.STD_SPACE = self.STD_SIZE * 1.25
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
         self.FPS = 48
         
-        self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
+        self.animation_timer.start(int(1/self.FPS * 1000))
         
         self.animation_time = 0.0
 
@@ -124,6 +126,50 @@ class ImageGalleryApp(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layout.addWidget(self.view)
         self.setCentralWidget(central_widget)
+
+    def imageToQPixmap(self, images):
+        pixmaps = []
+        
+        for image in tqdm(images, desc= "Scaling..."):
+            pixmap = image["pixmap"]
+            if type(image["pixmap"]) == PIL.Image:
+                image = image["pixmap"]
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                    
+                w, h = image.size
+                ar = w/h
+                
+                if max(h, w) == h:
+                    image = image.resize((int(self.STD_SIZE * ar), self.STD_SIZE))
+                else:
+                    image = image.resize((self.STD_SIZE, int(self.STD_SIZE / ar)))
+
+                w, h = image.size
+
+                data = image.tobytes("raw", "RGB")
+                qimage = QImage(data, w, h, w * 3, QImage.Format_RGB888)
+
+                pixmap = QPixmap.fromImage(qimage)
+            else:
+                h = pixmap.height()
+                w = pixmap.width()
+
+                ar = w/h
+                if max(h, w) == h:
+                    pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,
+                                        #    aspectRatioMode = Qt.KeepAspectRatio,
+                                        transformMode= Qt.SmoothTransformation
+                                        )
+                else:
+                    pixmap = pixmap.scaled(self.STD_SIZE, int(self.STD_SIZE / ar),
+                                        #    aspectRatioMode = Qt.KeepAspectRatio,
+                                        transformMode= Qt.SmoothTransformation
+                                        )
+
+            pixmaps.append(pixmap)
+            
+        return pixmaps
 
     def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)
@@ -139,21 +185,6 @@ class ImageGalleryApp(QMainWindow):
 
     def add_to_scene(self, x, y, image : QPixmap, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
         pixmap = image
-
-        # h = pixmap.height()
-        # w = pixmap.width()
-
-        # ar = w/h
-        # if max(h, w) == h:
-        #     pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,
-        #                         #    aspectRatioMode = Qt.KeepAspectRatio,
-        #                            transformMode= Qt.SmoothTransformation
-        #                            )
-        # else:
-        #     pixmap = pixmap.scaled(self.STD_SIZE, int(self.STD_SIZE / ar),
-        #                         #    aspectRatioMode = Qt.KeepAspectRatio,
-        #                            transformMode= Qt.SmoothTransformation
-        #                            )
         
         item = QGraphicsPixmapItem(pixmap)
 
@@ -179,8 +210,7 @@ class ImageGalleryApp(QMainWindow):
             th_0 = data['th_0']
             w = data['w']
             if w != 0:
-
-                # th = th_0 + w * self.animation_time # new angle (degrees)
+                # th = th_0 + w * self.animation_time # rotation with constant w
                 th = th_0 + w # reverse to initial position
                 
                 th = th * (2 * np.pi / 360)
@@ -193,6 +223,8 @@ class ImageGalleryApp(QMainWindow):
             self.image_data[item]['w'] *= 0.96 # reverse to initial position
 
     def circles(self, images):
+        images = self.imageToQPixmap(images)
+
         # center image is added within loop
         r = 0
         # ths is the thetas (angles) for each image in a ring
@@ -206,13 +238,6 @@ class ImageGalleryApp(QMainWindow):
 
             x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
             y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
-
-            # img = None
-            # if i == 0:
-            #     img = image
-
-            # else:
-            #     img = image[0]
 
             self.add_to_scene(x=x, y=y, image=image, h=th, r=r, initial_angle=th, 
                         direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
@@ -231,15 +256,43 @@ class ImageGalleryApp(QMainWindow):
                 ths = np.arange(0 + offset, 360 + offset, step)
                 # shuffle if you want expanding rings instead of spiralling rings
                 np.random.shuffle(ths)
+        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
 
     # makes circular rings, but tries to order images in rings by hue
     def circlesh(self, images):
+        imgs = images
+        pixmaps = self.imageToQPixmap(imgs)
+        images = []
+        # get hue
+        for image, pixmap in zip(imgs, pixmaps):
+            l = []
+            if "colors" in image:
+                l = image["colors"]
+            else:
+                print(9)
+                l = get_dominant_colors(Image.open(image["path"]))
+
+            l = l.reshape(int(len(l)/4), 4)
+            image = image["pixmap"]
+            tx = 0
+            ty = 0
+            tf = 0
+            for i, rgbf in enumerate(l):
+                r, g, b, f = rgbf
+                hue = colorsys.rgb_to_hsv(r/255, g/255, b/255)[0]
+                tx += np.cos(hue * 2 * np.pi) * f
+                ty += np.sin(hue * 2 * np.pi) * f
+                tf += f
+
+            avg_hue = np.arctan2(tx/tf, ty/tf) / (2 * np.pi)
+
+            images.append({"pixmap": pixmap, "hue": avg_hue})
+
         # center image is added within loop
         r = 0
         # number of images in ring
         n = 1
         total = 0
-        images = list(images)
 
         # ths is the thetas (angles) for each image in a ring
         # defined better at end of loop body
@@ -259,7 +312,7 @@ class ImageGalleryApp(QMainWindow):
             # this doesn't find the absolute best order-
             # -to minimize the distance from where the image should actually be based on hue (while evenly spacing images)
             # but it's a simple solution that adds a little structure to the ring order
-            imgs.sort(key= lambda x: x[1])
+            imgs.sort(key= lambda x: x["hue"])
 
             for image in imgs:
                 # "pop" the first element/angle to put image on
@@ -268,15 +321,16 @@ class ImageGalleryApp(QMainWindow):
                 
                 # instead of evenly spacing the images out, you can just use the hue as the angle
                 # this doesn't create a clean circle but will show hue distribution better
-                th = image[1] * 360
+                th = image["hue"] * 360
 
                 x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
                 y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
 
-                self.add_to_scene(x=x, y=y, image=image[0], h=th, r=r, initial_angle=th, 
+                self.add_to_scene(x=x, y=y, image=image["pixmap"], h=th, r=r, initial_angle=th, 
                             direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
             QApplication.processEvents()
 
+            # go to next ring
             r += 1
             # number of images in ring
             n = (8 * r + (r % 2) - 1 - random.randint(0, r * 2))
@@ -286,9 +340,12 @@ class ImageGalleryApp(QMainWindow):
             # offset = random.randint(0, 359) # alternative offset
             offset = total * 10 # I just the way this offset looks
             ths = np.arange(0 + offset, 360 + offset, step)
+        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
             
 
     def hexagons(self, images):
+        images = self.imageToQPixmap(images)
+
         # center image @ (0, 0)
         self.add_to_scene(x= 0, y= 0, image= images[0])
 
@@ -354,90 +411,50 @@ class ImageGalleryApp(QMainWindow):
                 
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
-                # if type(image) != Image:
-                #     image = image[0]
+
                 self.add_to_scene(x=x, y=y, image=image, h=th, 
                            r=radius, initial_angle=th, direction= 1)
                 
                 # QApplication.processEvents()
+        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
 
 
 if __name__ == "__main__":
-    start_time = time.time()
-    # add(dir= r"gallery-dl\pinterest\sidvenkatayogii\Reference", name= "pinterest")
-    # add_color(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference")
+    # start_time = time.time()
+    # add_content(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference")
     # end_time = time.time()
     # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
 
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
+    
     while window.animation_time < 3:
         app.processEvents()
+
     print("out")
-    # window.circles(np.arange(0, 300))
-    # window.hexagons(np.arange(0, 300))
+    # window.animation_timer.start()
+    # window.animation_timer.stop()
+    
     start_time = time.time()
     
-    images = search_color("pinterest", rgb= (105, 0, 186), k = 500)
+    images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
+    # images = search_content("pinterest", query_image_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 5)
+    # images = search_content("pinterest", query_text= "water", k = 5)
     
     # creates PyQt6 QImage
     # imgqt = ImageQt(images[0])
     # qimage = imgqt.copy()
     # for i in images[1:]:
     #     print(i[1])
+
     pixmaps = []
-    # i = 0
-    # for i, image in enumerate(images):
-    images[0] = [images[0], 0]
-    for image in tqdm(images):
-        # if image[1] > 0 or image[1] == 0:
-            # if i != 0:
-            #     image = image[0]
-            # else:
-            #     i += 1
-            image = image[0]
-
-            i1 = get_dominant_colors(image)
-            i1 = i1.reshape(int(len(i1)/4), 4)
-            hue = 0
-            for i, rgbf in enumerate(i1):
-                r, g, b = rgbf[:3]
-                hue += colorsys.rgb_to_hsv(r/255, g/255, b/255)[0] * (len(i1) - i)
-            hue /= (len(i1) * (len(i1) + 1))/2
-
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-            
-            width, height = image.size
-
-            data = image.tobytes("raw", "RGB")
-            qimage = QImage(data, width, height, width * 3, QImage.Format_RGB888)
-
-            pixmap = QPixmap.fromImage(qimage)
-
-            h = pixmap.height()
-            w = pixmap.width()
-
-            ar = w/h
-
-            if max(h, w) == h:
-                pixmap = pixmap.scaled(int(window.STD_SIZE * ar), window.STD_SIZE,
-                                    #    aspectRatioMode = Qt.KeepAspectRatio,
-                                    transformMode= Qt.SmoothTransformation
-                                    )
-            else:
-                pixmap = pixmap.scaled(window.STD_SIZE, int(window.STD_SIZE / ar),
-                                    #    aspectRatioMode = Qt.KeepAspectRatio,
-                                    transformMode= Qt.SmoothTransformation
-                                    )
-
-            pixmaps.append((pixmap, hue))
-            # pixmaps.append(pixmap)
-
-    # window.hexagons(pixmaps)
 
     end_time = time.time()
     print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-    window.circlesh(pixmaps) 
+    # window.circles(images)
+    print("done")
+    window.hexagons(images)
+    # window.circles(np.arange(0, 300))
+    # window.hexagons(np.arange(0, 300))
     sys.exit(app.exec_())
