@@ -15,7 +15,7 @@ import time
 
 # from search_color import search
 # from add_color import add
-from accessDBs import add_color, search_color, add_visual, search_visual
+from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
 from colors import get_dominant_colors
 
 import PIL
@@ -133,7 +133,7 @@ class ImageGalleryApp(QMainWindow):
         for image in tqdm(images, desc= "Scaling..."):
             pixmap = image.get("pixmap")
 
-            if image.get("image") == Image:
+            if "image" in image:
                 image = image["image"]
                 if image.mode != 'RGB':
                     image = image.convert('RGB')
@@ -273,11 +273,9 @@ class ImageGalleryApp(QMainWindow):
             if "colors" in image:
                 l = image["colors"]
             else:
-                print(9)
                 l = get_dominant_colors(Image.open(image["path"]))
 
             l = l.reshape(int(len(l)/4), 4)
-            image = image["pixmap"]
             tx = 0
             ty = 0
             tf = 0
@@ -424,11 +422,6 @@ class ImageGalleryApp(QMainWindow):
 
 
 if __name__ == "__main__":
-    # start_time = time.time()
-    # add_content(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference")
-    # end_time = time.time()
-    # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-
     app = QApplication(sys.argv)
     window = ImageGalleryApp()
     window.show()
@@ -437,13 +430,17 @@ if __name__ == "__main__":
         app.processEvents()
 
     print("out")
+    # start_time = time.time()
+    # add_visual(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference", model= "clip")
+    # end_time = time.time()
+    # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
     # window.animation_timer.start()
     # window.animation_timer.stop()
     
     start_time = time.time()
     # images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
     # images = search_content("pinterest", query_image_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 5)
-    images = search_visual("pinterest", file_path= r"images\alariko\C8wimbaqyU5.jpg", k = 300)
+    images = search_clip("pinterest", query= "motorcycle", k = 300)
     end_time = time.time()
     print(f"Elapsed time: {end_time - start_time:.3f} seconds")
     # creates PyQt6 QImage
@@ -454,7 +451,7 @@ if __name__ == "__main__":
 
 
 
-    window.circles(images)
+    window.circlesh(images)
     # print("done")
     # window.hexagons(images)
     # # window.circles(np.arange(0, 300))

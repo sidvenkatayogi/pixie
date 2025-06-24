@@ -5,7 +5,7 @@ from chromadb.utils.data_loaders import ImageLoader
 import numpy as np
 from tqdm import tqdm
 import torch
-import torchvision.transforms as tfms
+import torchvision.transforms.v2 as tfms
 import os
 from imagehash import colorhash
 from vectorDB import VectorDB
@@ -15,19 +15,30 @@ import torch
 import faiss
 import json
 import time
+import open_clip
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-# Load the pre-trained ViT model
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# Define preprocessing pipeline for images
 transform = tfms.Compose([
-    # tfms.Resize(224, 224),
+    tfms.Resize(size= (224, 224), interpolation= 1),
     # tfms.CenterCrop(224),
-    tfms.ToTensor(),
+    tfms.ToImage(),
+    tfms.ToDtype(torch.float32, scale=True),
     tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
+
+
+# open_clip.list_pretrained()
+open_clip_model_name = "ViT-B-32"
+open_clip_pretrained_weights = "laion2b_s34b_b79k"
+
+clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
+    open_clip_model_name,
+    pretrained=open_clip_pretrained_weights,
+    device=device
+)
 
 
 def get_files(folder_path, explore = False):
@@ -42,41 +53,58 @@ def get_files(folder_path, explore = False):
 
     return image_paths
 
-def add_visual(name, folder_path, explore= False, batch_size= 64):
-    image_paths = []
+
+def add_visual(name, folder_path, explore=False, batch_size=64, model="dino"):
     image_paths = get_files(folder_path, explore)
     all_embeddings = []
     current_batch_images = []
-    current_batch_paths = []
 
-    for i, path in enumerate(tqdm(image_paths, desc= "Creating Embeddings...")):
-            image = Image.open(path).convert("RGB").resize((224, 224))
-            transformed_image = transform(image)
-            current_batch_images.append(transformed_image)
-            current_batch_paths.append(path)
-            if len(current_batch_images) == batch_size or i == len(image_paths) - 1:
-                batch_tensor = torch.stack(current_batch_images).to(device)
-                with torch.no_grad():
+    current_preprocess = None
+    if model == "dino":
+        current_preprocess = transform
+    elif model == "clip":
+        current_preprocess = clip_preprocess
+    else:
+        raise ValueError("Model must be 'dino' or 'clip'")
+
+
+    for i, path in enumerate(tqdm(image_paths, desc=f"Creating Embeddings with {model.upper()}...")):
+        image = Image.open(path).convert("RGB")
+        transformed_image = current_preprocess(image)
+        current_batch_images.append(transformed_image)
+
+        if len(current_batch_images) == batch_size or i == len(image_paths) - 1:
+            batch_tensor = torch.stack(current_batch_images).to(device)
+            with torch.no_grad():
+                if model == "dino":
                     embeddings_batch = dino(batch_tensor)
-                all_embeddings.append(embeddings_batch.cpu())
+                elif model == "clip":
+                    embeddings_batch = clip_model.encode_image(batch_tensor)
+                    # embeddings_batch = embeddings_batch / embeddings_batch.norm(p=2, dim=-1, keepdim=True)
 
-                current_batch_images = []
-                current_batch_paths = []
+            all_embeddings.append(embeddings_batch.cpu())
+            current_batch_images = []
 
-    
     vectors = torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
     d = len(vectors[0])
-    index = faiss.IndexFlatIP(d)
+    index = None
+    if model == "dino":
+        index = faiss.IndexFlatIP(d)
+    elif model == "clip":
+        index = faiss.IndexFlatL2(d)
+
     index = faiss.IndexIDMap(index)
 
-    # Ensure unique IDs for each vector, matching original image_paths order
     ids = np.array(range(len(image_paths)))
     index.add_with_ids(vectors, ids)
 
-    faiss.write_index(index, f"database/{name}.index")
-    with open(f"database/{name}_paths.json", "w") as f:
+    os.makedirs("database", exist_ok=True)
+    faiss.write_index(index, f"database/{name}_{model}.index")
+    with open(f"database/{name}_{model}_paths.json", "w") as f:
         json.dump(image_paths, f)
+
+    print(f"FAISS index and paths saved for {name} using {model.upper()} model.")
 
 
 
@@ -106,7 +134,7 @@ def add_color(name, folder_path, explore= False):
 
 def search_visual(name, file_path, k = -1):
     start_time = time.time()
-    index = faiss.read_index(f"database/{name}.index")
+    index = faiss.read_index(f"database/{name}_dino.index")
     end_time = time.time()
     print(f"Loading time: {end_time - start_time:.3f} seconds")
 
@@ -129,7 +157,7 @@ def search_visual(name, file_path, k = -1):
     indices = indices[0]
     distances = distances[0]
     # Load the original image paths to map back to filenames
-    with open(os.path.join("database", f"{name}_paths.json"), "r") as f:
+    with open(os.path.join("database", f"{name}_dino_paths.json"), "r") as f:
         image_paths = json.load(f)
         
     results = []
@@ -137,6 +165,45 @@ def search_visual(name, file_path, k = -1):
         results.append({"path": image_paths[i], "distance": distances[i]})
 
     results.sort(key= lambda x: x["distance"])
+    return results
+
+
+def search_clip(name, query : str, k = -1):
+    start_time = time.time()
+
+    index = faiss.read_index(f"database/{name}_clip.index")
+    end_time = time.time()
+    print(f"Loading index time: {end_time - start_time:.3f} seconds")
+
+    if k == -1:
+        k = index.ntotal
+
+    start_time = time.time()
+    text_tokens = open_clip.tokenize(query).to(device)
+
+    with torch.no_grad():
+        query_embedding = clip_model.encode_text(text_tokens)
+        query_embedding = query_embedding.cpu().numpy()
+    end_time = time.time()
+    print(f"Embedding query time: {end_time - start_time:.3f} seconds")
+
+    start_time = time.time()
+    distances, indices = index.search(query_embedding, k)
+    end_time = time.time()
+    print(f"Search time: {end_time - start_time:.3f} seconds")
+
+    indices = indices[0]
+    distances = distances[0]
+
+    with open(f"database/{name}_clip_paths.json", "r") as f:
+        image_paths = json.load(f)
+
+    results = []
+    for i in range(len(indices)):
+        if indices[i] < len(image_paths):
+            results.append({"path": image_paths[indices[i]], "distance": distances[i]})
+
+    results.sort(key=lambda x: x["distance"])
     return results
 
 
