@@ -1,6 +1,6 @@
 # TODO 
-# make it auto scale to a good starting view
-# fuck chromadb, restart with faiss
+# progressively load images (scale and create pixmpas so it looks like its loading instead of displaying all at once)
+# us QThreads
 
 import sys
 import os
@@ -109,6 +109,8 @@ class ImageGalleryApp(QMainWindow):
         self.scene = QGraphicsScene()
         self.view = CustomGraphicsView(self.scene)
 
+        self.loadonce = True
+
         # self.image_data = []
         self.image_data = {}
         self.STD_SIZE = 512
@@ -118,9 +120,20 @@ class ImageGalleryApp(QMainWindow):
         self.animation_timer.timeout.connect(self.update_animation)
         self.FPS = 48
         
-        self.animation_timer.start(int(1/self.FPS * 1000))
+        self.animation_timer.start(int(1000/self.FPS))
         
         self.animation_time = 0.0
+
+        self.zoom_animation_timer = QTimer()
+        self.zoom_animation_timer.timeout.connect(self.update_zoom)
+        
+        # Animation state variables
+        self.zoom_start_time = 0
+        self.zoom_duration = 2500
+        self.zoom_start_scale = 0.1
+        self.zoom_target_rect = QRectF()
+        self.zoom_animating = False
+
 
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
@@ -129,8 +142,11 @@ class ImageGalleryApp(QMainWindow):
 
     def imageToQPixmap(self, images):
         pixmaps = []
-        
-        for image in tqdm(images, desc= "Scaling..."):
+        if not isinstance(images, list):
+            images = [images]
+            
+        # for image in tqdm(images, desc= "Scaling..."): 
+        for image in images: 
             pixmap = image.get("pixmap")
 
             if "image" in image:
@@ -172,8 +188,99 @@ class ImageGalleryApp(QMainWindow):
                                         )
 
             pixmaps.append(pixmap)
-            
+        
+        if len(pixmaps) == 1:
+            return pixmaps[0]
         return pixmaps
+    
+    
+    def calculate_bounds(self):
+        
+        min_x = min_y = max_x = max_y = 0
+        
+        for item in self.image_data.keys():
+            rect = item.boundingRect()
+            pos = item.pos()
+            
+            l = pos.x()
+            t = pos.y()
+            r = pos.x() + rect.width()
+            b = pos.y() + rect.height()
+            
+            min_x = min(min_x, l)
+            min_y = min(min_y, t)
+            max_x = max(max_x, r)
+            max_y = max(max_y, b)
+        
+        return QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
+
+
+    def start_zoom(self, margin_p=0.1, duration_ms=2500, start_scale=0.1):
+        bounds = self.calculate_bounds()
+        
+        margin_x = bounds.width() * margin_p
+        margin_y = bounds.height() * margin_p
+        
+        self.zoom_target_rect = QRectF(
+            bounds.x() - margin_x,
+            bounds.y() - margin_y,
+            bounds.width() + 2 * margin_x,
+            bounds.height() + 2 * margin_y
+        )
+        
+        self.zoom_duration = duration_ms
+        self.zoom_start_scale = start_scale
+        self.zoom_elapsed = 0
+        self.zoom_animating = True
+        
+        start_rect = QRectF(0, 0,
+            self.zoom_target_rect.width() * start_scale,
+            self.zoom_target_rect.height() * start_scale
+        )
+        
+        self.view.fitInView(start_rect, Qt.KeepAspectRatio)
+        
+        self.zoom_animation_timer.start(int(1000/(self.FPS * 2)))
+
+    def update_zoom(self):
+        if not self.zoom_animating:
+            return
+        
+        self.zoom_elapsed += int(1000/(self.FPS * 2))
+        
+        if self.zoom_elapsed >= self.zoom_duration:
+            self.view.fitInView(self.zoom_target_rect, Qt.KeepAspectRatio)
+            self.zoom_animation_timer.stop()
+            self.zoom_animating = False
+            return
+        
+        t = self.zoom_elapsed / self.zoom_duration
+        
+        eased_progress = self.ease_out_exp(t)
+        
+        current_scale = self.zoom_start_scale + (1.0 - self.zoom_start_scale) * eased_progress
+        
+        current_rect = QRectF(
+            self.zoom_target_rect.center().x() - (self.zoom_target_rect.width() * current_scale) / 2,
+            self.zoom_target_rect.center().y() - (self.zoom_target_rect.height() * current_scale) / 2,
+            self.zoom_target_rect.width() * current_scale,
+            self.zoom_target_rect.height() * current_scale
+        )
+        
+        self.view.fitInView(current_rect, Qt.KeepAspectRatio)
+
+    def animate_zoom_delayed(self, delay_ms=100, duration_ms=2500):
+        def x():
+            self.start_zoom(duration_ms=duration_ms)
+        
+        QTimer.singleShot(delay_ms, x)
+
+    def ease_out_cubic(self, t):
+        return 1 - (1 - t)**3 if t != 1 else 1
+
+    def ease_out_exp(self, t):
+        return 1 - np.exp(-5 * t) if t != 1 else 1 # for floating point
+    
 
     def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)
@@ -188,7 +295,11 @@ class ImageGalleryApp(QMainWindow):
         return QPixmap.fromImage(image)
 
     def add_to_scene(self, x, y, image : QPixmap, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
-        pixmap = image
+        pixmap = None
+        if isinstance(image, QPixmap):
+            pixmap = image
+        else:
+            pixmap = self.imageToQPixmap(image)
         
         item = QGraphicsPixmapItem(pixmap)
 
@@ -199,14 +310,14 @@ class ImageGalleryApp(QMainWindow):
         base_speed = 1000  # degrees per frame
 
         # direction: (1 = clockwise, -1 = counterclockwise)
-        w = base_speed * direction / (r + 1)# angular velocity
+        w = base_speed * direction / (r + 1) # angular velocity
         
         self.image_data[item] = {'r': r,
                              'th_0': initial_angle,
                              'w': w,}
 
     def update_animation(self):
-        self.animation_time += (int(1/self.FPS * 1000) / 1000) # 60 FPS
+        self.animation_time += (int(1000/self.FPS) / 1000) # 60 FPS
         
         for item, data in self.image_data.items():
             # item = data['item']
@@ -225,9 +336,10 @@ class ImageGalleryApp(QMainWindow):
                 pixmap = item.pixmap()
                 item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
             self.image_data[item]['w'] *= 0.96 # reverse to initial position
+    
 
     def circles(self, images):
-        images = self.imageToQPixmap(images)
+        # images = self.imageToQPixmap(images)
 
         # center image is added within loop
         r = 0
@@ -260,7 +372,10 @@ class ImageGalleryApp(QMainWindow):
                 ths = np.arange(0 + offset, 360 + offset, step)
                 # shuffle if you want expanding rings instead of spiralling rings
                 np.random.shuffle(ths)
-        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
+
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
+        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+
 
     # makes circular rings, but tries to order images in rings by hue
     def circlesh(self, images):
@@ -268,12 +383,12 @@ class ImageGalleryApp(QMainWindow):
         pixmaps = self.imageToQPixmap(imgs)
         images = []
         # get hue
-        for image, pixmap in zip(imgs, pixmaps):
+        for image, pixmap in tqdm(zip(imgs, pixmaps), total= len(imgs), desc= "Getting Colors..."):
             l = []
             if "colors" in image:
                 l = image["colors"]
             else:
-                l = get_dominant_colors(Image.open(image["path"]))
+                l = get_dominant_colors(Image.open(image["path"]).convert('RGB'))
 
             l = l.reshape(int(len(l)/4), 4)
             tx = 0
@@ -342,8 +457,9 @@ class ImageGalleryApp(QMainWindow):
             # offset = random.randint(0, 359) # alternative offset
             offset = total * 10 # I just the way this offset looks
             ths = np.arange(0 + offset, 360 + offset, step)
-        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
-            
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
+        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+
 
     def hexagons(self, images):
         images = self.imageToQPixmap(images)
@@ -418,7 +534,9 @@ class ImageGalleryApp(QMainWindow):
                            r=radius, initial_angle=th, direction= 1)
                 
                 # QApplication.processEvents()
-        # self.animation_timer.start(int(1/self.FPS * 1000))  # ~60 FPS (16ms intervals)
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
+        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+
 
 
 if __name__ == "__main__":
@@ -440,7 +558,7 @@ if __name__ == "__main__":
     start_time = time.time()
     # images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
     # images = search_content("pinterest", query_image_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 5)
-    images = search_clip("pinterest", query= "motorcycle", k = 300)
+    images = search_clip("pinterest", query= "food", k = 500)
     end_time = time.time()
     print(f"Elapsed time: {end_time - start_time:.3f} seconds")
     # creates PyQt6 QImage
@@ -451,7 +569,7 @@ if __name__ == "__main__":
 
 
 
-    window.circlesh(images)
+    window.circles(images)
     # print("done")
     # window.hexagons(images)
     # # window.circles(np.arange(0, 300))
