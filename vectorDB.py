@@ -80,19 +80,19 @@ class VectorDB:
         results.sort(key= lambda x: x["distance"])
         return results[:k]
     
-    def save_DB(self, folder_name= "vectorDBn"):
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
+    def save_DB(self, folder_name):
+        if not os.path.exists(os.path.join("collections", folder_name)):
+            os.makedirs(os.path.join("collections", folder_name))
 
         d = {self.name : {"data" : self.vector_data, "index" : self.vector_index}}
 
-        with open(os.path.join(folder_name, f"{self.name}.json"), "w") as f:
+        with open(os.path.join("collections", folder_name, f"{self.name}.json"), "w") as f:
             json.dump(d, f, cls= NumpyEncoder, indent=4)
 
     @classmethod
-    def get_DB(cls, name, folder_name= "vectorDBn"):
+    def get_DB(cls, name):
         d = {}
-        with open(os.path.join(folder_name, f"{name}.json"), "r") as f:
+        with open(os.path.join("collections", name, f"{name}.json"), "r") as f:
             d = json.load(f, cls= NumpyDecoder)
 
         vd = d[name]["data"]

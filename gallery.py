@@ -7,11 +7,15 @@ import numpy as np
 import random
 import colorsys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
-                             QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QWidget)
+                             QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, 
+                             QHBoxLayout, QWidget, QPushButton, QSlider, QLabel,
+                             QLineEdit, QComboBox, QFileDialog, QFrame, QColorDialog,
+                             QButtonGroup, QRadioButton, QGroupBox, QSpacerItem,
+                             QSizePolicy, QProgressDialog, QMessageBox, QCheckBox)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
-from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize
+from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize, QThread
 import time
-
+import json
 # from search_color import search
 # from add_color import add
 from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
@@ -19,8 +23,8 @@ from colors import get_dominant_colors
 
 import PIL
 from PIL import Image
-from PIL.ImageQt import ImageQt # only works for PyQt6
- 
+# from PIL.ImageQt import ImageQt # only works for PyQt6
+
 from tqdm import tqdm
 
 class CustomGraphicsView(QGraphicsView):
@@ -100,17 +104,16 @@ class CustomGraphicsView(QGraphicsView):
 
 
 class ImageGalleryApp(QMainWindow):
-    def __init__(self):
+    def __init__(self, collection_data):
         super().__init__()
-        self.setWindowTitle("gallery")
-        self.setGeometry(100, 100, 1024, 768)
+        self.collection_data = collection_data
+        self.current_search_mode = "browse"  # browse, color, clip, dino
+        self.setWindowTitle("Image Gallery")
+        self.setGeometry(100, 100, 1400, 768)
 
         self.scene = QGraphicsScene()
         self.view = CustomGraphicsView(self.scene)
-
         self.loadonce = False
-
-        # self.image_data = []
         self.image_data = {}
         self.STD_SIZE = 512
         self.STD_SPACE = self.STD_SIZE * 1.25
@@ -118,27 +121,708 @@ class ImageGalleryApp(QMainWindow):
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
         self.FPS = 48
-        
-        self.animation_timer.start(int(1000/self.FPS))
-        
         self.animation_time = 0.0
 
         self.zoom_animation_timer = QTimer()
         self.zoom_animation_timer.timeout.connect(self.update_zoom)
         
-        # Animation state variables
         self.zoom_start_time = 0
         self.zoom_duration = 2500
         self.zoom_start_scale = 0.1
         self.zoom_target_rect = QRectF()
         self.zoom_animating = False
 
-
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
-        layout.addWidget(self.view)
-        self.setCentralWidget(central_widget)
+        self.selected_color = QColor(255, 0, 0)  # Default red
+        self.selected_image_path = ""
+        
+        self.setupUI()
     
+    def setupUI(self):
+        main_widget = QWidget()
+        main_layout = QHBoxLayout(main_widget)
+        
+        # graphics view (left side)
+        main_layout.addWidget(self.view, 3)  # Give more space to the view
+        
+        # Control panel (right side)
+        control_panel = self.createControlPanel()
+        main_layout.addWidget(control_panel, 1)  # Smaller space for controls
+        
+        self.setCentralWidget(main_widget)
+
+    def createControlPanel(self):
+        control_frame = QFrame()
+        control_frame.setFrameStyle(QFrame.StyledPanel)
+        control_frame.setMinimumWidth(300)
+        control_frame.setMaximumWidth(350)
+        
+        layout = QVBoxLayout(control_frame)
+        
+        title = QLabel("Gallery Controls")
+        title.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        layout_group = QGroupBox("Layout Type")
+        layout_group_layout = QVBoxLayout(layout_group)
+        
+        self.layout_buttons = QButtonGroup()
+        self.circles_radio = QRadioButton("Circles")
+        self.circlesh_radio = QRadioButton("Circles by Hue")
+        self.hexagons_radio = QRadioButton("Hexagons")
+        
+        self.circles_radio.setChecked(True)  # default
+        
+        self.layout_buttons.addButton(self.circles_radio, 0)
+        self.layout_buttons.addButton(self.circlesh_radio, 1)
+        self.layout_buttons.addButton(self.hexagons_radio, 2)
+        
+        layout_group_layout.addWidget(self.circles_radio)
+        layout_group_layout.addWidget(self.circlesh_radio)
+        layout_group_layout.addWidget(self.hexagons_radio)
+        
+        layout.addWidget(layout_group)
+        
+        layout.addWidget(QLabel("Number of Images:"))
+        self.image_count_slider = QSlider(Qt.Horizontal)
+        self.image_count_slider.setMinimum(2)
+        self.image_count_slider.setMaximum(self.collection_data["image_count"])
+        self.image_count_slider.setValue(max(2, int(self.collection_data["image_count"] * 0.5)))
+        self.image_count_slider.valueChanged.connect(self.updateImageCountLabel)
+        
+        self.image_count_label = QLabel(str(max(2, int(self.collection_data["image_count"] * 0.5))))
+        self.image_count_label.setAlignment(Qt.AlignCenter)
+        
+        layout.addWidget(self.image_count_slider)
+        layout.addWidget(self.image_count_label)
+        
+        # ADD THE SEARCH/LOAD SECTION HERE
+        self.search_frame = QFrame()
+        self.search_frame.setFrameStyle(QFrame.StyledPanel)
+        search_layout = QVBoxLayout(self.search_frame)
+        
+        # Create index buttons
+        self.create_index_widget = QWidget()
+        create_index_layout = QVBoxLayout(self.create_index_widget)
+        
+        if not self.collection_data["clip"]:
+            self.create_clip_btn = QPushButton("Create CLIP Index")
+            self.create_clip_btn.clicked.connect(lambda: self.createIndex("clip"))
+            search_layout.addWidget(self.create_clip_btn)
+        if not self.collection_data["dino"]:
+            self.create_dino_btn = QPushButton("Create DINO Index")
+            self.create_dino_btn.clicked.connect(lambda: self.createIndex("dino"))
+            create_index_layout.addWidget(self.create_dino_btn)
+            search_layout.addWidget(self.create_index_widget)
+        
+        if not (self.collection_data["clip"] and self.collection_data["dino"]):
+            # ADD THE SEARCH FRAME TO THE MAIN LAYOUT
+            layout.addWidget(self.search_frame)
+
+        # Search type selection
+        search_group = QGroupBox("Search Type")
+        search_group_layout = QVBoxLayout(search_group)
+        
+        # Modify the search type combo box population
+        self.search_type_combo = QComboBox()
+        search_types = ["Color Search"]  # Color search always available
+
+        # Add CLIP text search if supported
+        if self.collection_data.get("clip", False):
+            search_types.append("Text Search (CLIP)")
+            search_types.append("Image Content Search (CLIP)")
+
+        # Add Visual Similarity if DINO supported  
+        if self.collection_data.get("dino", False):
+            search_types.append("Image Similarity Search (DINO)")
+
+        self.search_type_combo.addItems(search_types)
+        self.search_type_combo.currentTextChanged.connect(self.onSearchTypeChanged)
+        
+        search_group_layout.addWidget(self.search_type_combo)
+        layout.addWidget(search_group)
+        
+        # Dynamic search controls container
+        self.search_controls_frame = QFrame()
+        self.search_controls_layout = QVBoxLayout(self.search_controls_frame)
+        layout.addWidget(self.search_controls_frame)
+        
+        # Initialize with color search controls
+        self.setupColorSearchControls()
+
+        self.loadonce_checkbox = QCheckBox("Load all images at once")
+        self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
+        layout.addWidget(self.loadonce_checkbox)
+        
+        # Database selection
+        layout.addWidget(QLabel("Database:"))
+        self.database_combo = QComboBox()
+        self.database_combo.addItems([self.collection_data["name"]])  # Add more databases as needed
+        layout.addWidget(self.database_combo)
+        
+        # Generate button
+        self.generate_button = QPushButton("Generate Gallery")
+        self.generate_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.generate_button.clicked.connect(self.generateGallery)
+        layout.addWidget(self.generate_button)
+        
+        # Clear button
+        self.clear_button = QPushButton("Clear Gallery")
+        self.clear_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                padding: 8px;
+                font-size: 12px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+        """)
+        self.clear_button.clicked.connect(self.clearGallery)
+        layout.addWidget(self.clear_button)
+        
+        # Add spacer to push everything to top
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+        
+        return control_frame
+    
+
+    def onRGBInputChanged(self, text):
+        try:
+            if ',' in text:
+                rgb_values = [int(x.strip()) for x in text.split(',')]
+                if len(rgb_values) == 3 and all(0 <= val <= 255 for val in rgb_values):
+                    r, g, b = rgb_values
+                    self.selected_color = QColor(r, g, b)
+                    self.color_button.setStyleSheet(f"background-color: {self.selected_color.name()}; border: 2px solid #666;")
+        except ValueError:
+            pass  # Invalid input, ignore
+
+    def selectColorImage(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Reference Image for Color Search", 
+            "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.selected_color_image_path = file_path
+            filename = os.path.basename(file_path)
+            self.color_image_path_label.setText(f"Selected: {filename}")
+    def clearSearchControls(self):
+        # Remove all widgets from search controls layout
+        while self.search_controls_layout.count():
+            child = self.search_controls_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+    
+    def setupColorSearchControls(self):
+        self.clearSearchControls()
+        
+        # Color search mode selection
+        mode_label = QLabel("Search by:")
+        self.search_controls_layout.addWidget(mode_label)
+        
+        self.color_search_mode = QComboBox()
+        self.color_search_mode.addItems(["RGB Color Picker", "Reference Image"])
+        self.color_search_mode.currentTextChanged.connect(self.onColorSearchModeChanged)
+        self.search_controls_layout.addWidget(self.color_search_mode)
+        
+        # Container for dynamic controls
+        self.color_controls_container = QWidget()
+        self.color_controls_layout = QVBoxLayout(self.color_controls_container)
+        self.search_controls_layout.addWidget(self.color_controls_container)
+        
+        # Initialize with color picker mode
+        self.setupColorPickerControls()
+
+    def setupColorImageControls(self):
+        # Image selector
+        image_label = QLabel("Reference Image:")
+        self.color_controls_layout.addWidget(image_label)
+        
+        self.color_image_path_label = QLabel("No image selected")
+        self.color_image_path_label.setWordWrap(True)
+        self.color_image_path_label.setStyleSheet("border: 1px solid #ccc; padding: 5px; background-color: #f9f9f9;")
+        self.color_controls_layout.addWidget(self.color_image_path_label)
+        
+        self.select_color_image_button = QPushButton("Select Image")
+        self.select_color_image_button.clicked.connect(self.selectColorImage)
+        self.color_controls_layout.addWidget(self.select_color_image_button)
+    def setupColorPickerControls(self):
+        # Color picker button
+        color_label = QLabel("Select Color:")
+        self.color_controls_layout.addWidget(color_label)
+        
+        self.color_button = QPushButton()
+        self.color_button.setFixedHeight(40)
+        self.color_button.setStyleSheet(f"background-color: {self.selected_color.name()}; border: 2px solid #666;")
+        self.color_button.clicked.connect(self.selectColor)
+        self.color_controls_layout.addWidget(self.color_button)
+        
+        # # Optional: RGB input field for manual entry
+        # rgb_label = QLabel("Or enter RGB values:")
+        # self.color_controls_layout.addWidget(rgb_label)
+        
+        # self.rgb_input = QLineEdit()
+        # self.rgb_input.setPlaceholderText("R,G,B (e.g., 255,128,0)")
+        # self.rgb_input.textChanged.connect(self.onRGBInputChanged)
+        # self.color_controls_layout.addWidget(self.rgb_input)
+
+
+    def onColorSearchModeChanged(self, mode):
+        # Clear existing controls
+        while self.color_controls_layout.count():
+            child = self.color_controls_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        if mode == "RGB Color Picker":
+            self.setupColorPickerControls()
+        else:  # Reference Image
+            self.setupColorImageControls()
+
+    def setupTextSearchControls(self):
+        self.clearSearchControls()
+        
+        # Text input
+        text_label = QLabel("Search Query:")
+        self.search_controls_layout.addWidget(text_label)
+        
+        self.text_input = QLineEdit()
+        self.text_input.setPlaceholderText("Enter search text...")
+        self.search_controls_layout.addWidget(self.text_input)
+    
+    def setupVisualSimilarityControls(self):
+        self.clearSearchControls()
+        
+        # Image selector
+        image_label = QLabel("Reference Image:")
+        self.search_controls_layout.addWidget(image_label)
+        
+        self.image_path_label = QLabel("No image selected")
+        self.image_path_label.setWordWrap(True)
+        self.image_path_label.setStyleSheet("border: 1px solid #ccc; padding: 5px; background-color: #f9f9f9;")
+        self.search_controls_layout.addWidget(self.image_path_label)
+        
+        self.select_image_button = QPushButton("Select Image")
+        self.select_image_button.clicked.connect(self.selectImage)
+        self.search_controls_layout.addWidget(self.select_image_button)
+    
+    def setupImageSearchControls(self):
+        # Same as visual similarity for now
+        self.setupVisualSimilarityControls()
+    
+    def onSearchTypeChanged(self, search_type):
+        if search_type == "Color Search":
+            self.setupColorSearchControls()
+        elif search_type == "Text Search (CLIP)":
+            self.setupTextSearchControls()
+        elif search_type == "Image Similarity Search (DINO)":
+            self.setupVisualSimilarityControls()
+        elif search_type == "Image Content Search (CLIP)":
+            self.setupImageSearchControls()
+    
+    def selectColor(self):
+        color = QColorDialog.getColor(self.selected_color, self, "Select Color")
+        if color.isValid():
+            self.selected_color = color
+            self.color_button.setStyleSheet(f"background-color: {color.name()}; border: 2px solid #666;")
+    
+    def selectImage(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Reference Image", 
+            "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.selected_image_path = file_path
+            # Show just the filename for brevity
+            filename = os.path.basename(file_path)
+            self.image_path_label.setText(f"Selected: {filename}")
+    
+    def updateImageCountLabel(self, value):
+        self.image_count_label.setText(str(value))
+    
+    def clearGallery(self):
+        # Stop animations
+        self.animation_timer.stop()
+        self.zoom_animation_timer.stop()
+        
+        # Clear scene
+        self.scene.clear()
+        self.image_data.clear()
+        
+        # Reset view
+        self.view.resetTransform()
+        self.view.centerOn(0, 0)
+        
+        # Reset animation state
+        self.animation_time = 0.0
+        self.zoom_animating = False
+
+    def add_index(self, name, directory, explore, by):
+        if by == "color":
+            add_color(name=name, folder_path=directory, explore=explore)
+        else:
+            add_visual(name=name, folder_path=directory, explore=explore, model= by)
+
+    def onSearchModeChanged(self, mode):
+        """Handle search mode change"""
+        self.current_search_mode = mode.lower().replace(" search", "")
+        self.setupSearchInput()
+
+    def onLoadModeChanged(self, checked):
+        """Handle load mode change"""
+        self.loadonce = checked
+
+    def setupSearchInput(self):
+        """Setup search input based on current mode"""
+        # Clear existing input widgets
+        for i in reversed(range(self.search_input_layout.count())):
+            self.search_input_layout.itemAt(i).widget().setParent(None)
+        
+        if self.current_search_mode == "browse":
+            return
+        
+        if self.current_search_mode == "color":
+            # Color search input
+            self.search_input_layout.addWidget(QLabel("Search by:"))
+            
+            color_mode_combo = QComboBox()
+            color_mode_combo.addItems(["RGB Color", "Query Image"])
+            self.search_input_layout.addWidget(color_mode_combo)
+            
+            # RGB input
+            self.rgb_input = QLineEdit()
+            self.rgb_input.setPlaceholderText("R,G,B (e.g., 255,0,0)")
+            self.search_input_layout.addWidget(self.rgb_input)
+            
+            # Image selection
+            image_select_btn = QPushButton("Select Query Image")
+            image_select_btn.clicked.connect(self.selectQueryImage)
+            self.search_input_layout.addWidget(image_select_btn)
+            
+        elif self.current_search_mode == "clip":
+            # CLIP search input
+            self.search_input_layout.addWidget(QLabel("Search by:"))
+            
+            clip_mode_combo = QComboBox()
+            clip_mode_combo.addItems(["Text Query", "Query Image"])
+            self.search_input_layout.addWidget(clip_mode_combo)
+            
+            # Text input
+            self.text_input = QLineEdit()
+            self.text_input.setPlaceholderText("Enter text description...")
+            self.search_input_layout.addWidget(self.text_input)
+            
+            # Image selection
+            image_select_btn = QPushButton("Select Query Image") 
+            image_select_btn.clicked.connect(self.selectQueryImage)
+            self.search_input_layout.addWidget(image_select_btn)
+            
+        elif self.current_search_mode == "dino":
+            # DINO search input
+            self.search_input_layout.addWidget(QLabel("Query Image:"))
+            image_select_btn = QPushButton("Select Query Image")
+            image_select_btn.clicked.connect(self.selectQueryImage)
+            self.search_input_layout.addWidget(image_select_btn)
+        
+        # Search button
+        search_btn = QPushButton("Search")
+        search_btn.clicked.connect(self.performSearch)
+        self.search_input_layout.addWidget(search_btn)
+
+    def selectQueryImage(self):
+        """Select query image for similarity search"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Query Image", "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.query_image_path = file_path
+            # Show selected image path
+            if hasattr(self, 'query_image_label'):
+                self.query_image_label.setText(f"Selected: {os.path.basename(file_path)}")
+
+    def createIndex(self, index_type):
+        """Create similarity search index"""
+        if not self.collection_data:
+            return
+            
+        from accessDBs import add_visual
+        from PyQt5.QtCore import QThread, pyqtSignal
+        
+        class IndexCreationWorker(QThread):
+            progress = pyqtSignal(str)
+            finished = pyqtSignal()
+            error = pyqtSignal(str)
+            
+            def __init__(self, name, folder, explore, index_type):
+                super().__init__()
+                self.name = name
+                self.folder = folder 
+                self.explore = explore
+                self.index_type = index_type
+                
+            def run(self):
+                try:
+                    self.progress.emit(f"Creating {self.index_type.upper()} index...")
+                    add_visual(self.name, self.folder, self.explore, model=self.index_type)
+                    self.finished.emit()
+                except Exception as e:
+                    self.error.emit(str(e))
+        
+        # Show progress dialog
+        progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", "Cancel", 0, 0, self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.show()
+        
+        # Start worker
+        self.index_worker = IndexCreationWorker(
+            self.collection_data['name'],
+            self.collection_data['folder'], 
+            self.collection_data['subfolders'],
+            index_type
+        )
+        
+        def on_finished():
+            progress_dialog.close()
+            # self.updateSearchModeOptions()
+            self.collection_data[index_type] = True
+            QMessageBox.information(self, "Success", f"{index_type.upper()} index created successfully!")
+
+            collections = []
+            with open("collections.json", 'r') as f:
+                collections = json.load(f)
+                for i, c in enumerate(collections):
+                    if c["name"] == self.collection_data["name"]:
+                        collections[i][index_type] = self.collection_data[index_type]
+            
+            with open("collections.json", 'w') as f:
+                json.dump(collections, f, indent=2)
+
+            self.updateUIAfterIndexCreation()
+            
+        def on_error(error_msg):
+            progress_dialog.close()
+            QMessageBox.critical(self, "Error", f"Failed to create index: {error_msg}")
+        
+        self.index_worker.finished.connect(on_finished)
+        self.index_worker.error.connect(on_error)
+        self.index_worker.start()
+
+
+    def updateUIAfterIndexCreation(self):
+        """Update UI elements after creating a new index"""
+        # Clear and recreate search types
+        search_types = ["Color Search"]  # Color search always available
+        
+        if self.collection_data.get("clip", False):
+            search_types.append("Text Search (CLIP)")
+            search_types.append("Image Content Search (CLIP)")
+            
+            # Remove CLIP index creation button if it exists
+            if hasattr(self, 'create_clip_btn') and self.create_clip_btn:
+                self.create_clip_btn.setParent(None)
+                self.create_clip_btn.deleteLater()
+                self.create_clip_btn = None
+        
+        if self.collection_data.get("dino", False):
+            search_types.append("Image Similarity Search (DINO)")
+            
+            # Remove DINO index creation button if it exists
+            if hasattr(self, 'create_dino_btn') and self.create_dino_btn:
+                self.create_dino_btn.setParent(None)
+                self.create_dino_btn.deleteLater()
+                self.create_dino_btn = None
+        
+        # Hide or remove the search frame if both indices are created
+        if self.collection_data.get("clip", False) and self.collection_data.get("dino", False):
+            if hasattr(self, 'search_frame'):
+                self.search_frame.hide()  # or use .deleteLater() to remove it completely
+        
+        # Update search type combo box
+        current_search_type = self.search_type_combo.currentText()
+        self.search_type_combo.clear()
+        self.search_type_combo.addItems(search_types)
+        
+        # Try to restore previous selection if it still exists
+        index = self.search_type_combo.findText(current_search_type)
+        if index >= 0:
+            self.search_type_combo.setCurrentIndex(index)
+
+
+    def performSearch(self):
+        """Perform similarity search based on current mode"""
+        if not self.collection_data or self.current_search_mode == "browse":
+            return
+            
+        from accessDBs import search_color, search_clip, search_visual
+        
+        try:
+            results = []
+            name = self.collection_data['name']
+            
+            if self.current_search_mode == "color":
+                if hasattr(self, 'query_image_path'):
+                    results = search_color(name, path=self.query_image_path)
+                elif hasattr(self, 'rgb_input') and self.rgb_input.text():
+                    rgb_text = self.rgb_input.text().strip()
+                    rgb = tuple(map(int, rgb_text.split(',')))
+                    results = search_color(name, rgb=rgb)
+                    
+            elif self.current_search_mode == "clip":
+                if hasattr(self, 'text_input') and self.text_input.text():
+                    results = search_clip(name, self.text_input.text())
+                elif hasattr(self, 'query_image_path'):
+                    # For CLIP image search, you'd need to modify accessDBs.py
+                    pass
+                    
+            elif self.current_search_mode == "dino":
+                if hasattr(self, 'query_image_path'):
+                    results = search_visual(name, self.query_image_path)
+            
+            # Display results
+            self.displaySearchResults(results)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Search Error", f"Search failed: {str(e)}")
+
+    def displaySearchResults(self, results):
+        """Display search results in the grid"""
+        # Clear current grid
+        self.clearImageGrid()
+        
+        # Load results based on loadonce setting
+        if self.loadonce:
+            # Load all at once
+            for result in results:
+                self.addImageToGrid(result['path'])
+        else:
+            # Load sequentially with delay
+            self.search_results = results
+            self.current_result_index = 0
+            self.loadNextSearchResult()
+
+    def loadNextSearchResult(self):
+        """Load next search result sequentially"""
+        if hasattr(self, 'search_results') and self.current_result_index < len(self.search_results):
+            result = self.search_results[self.current_result_index]
+            self.addImageToGrid(result['path'])
+            self.current_result_index += 1
+            
+            # Schedule next load
+            QTimer.singleShot(100, self.loadNextSearchResult)
+
+    def generateGallery(self):
+        # Clear existing gallery first
+        self.clearGallery()
+        
+        # Get parameters from UI
+        num_images = self.image_count_slider.value()
+        database = self.collection_data["name"]
+        search_type = self.search_type_combo.currentText()
+        layout_type = self.layout_buttons.checkedId()
+        
+        try:
+            # Perform search based on type
+            images = []
+            
+            if search_type == "Color Search":
+                # Check which mode is being used
+                if hasattr(self, 'color_search_mode'):
+                    mode = self.color_search_mode.currentText()
+                    
+                    if mode == "Reference Image":
+                        # Use image path for color search
+                        if hasattr(self, 'selected_color_image_path') and self.selected_color_image_path:
+                            images = search_color(database, path=self.selected_color_image_path, k=num_images)
+                        else:
+                            QMessageBox.warning(self, "Warning", "Please select a reference image for color search")
+                            return
+                    else:  # RGB Color Picker mode
+                        # Use RGB values from color picker or manual input
+                        if hasattr(self, 'rgb_input') and self.rgb_input.text().strip():
+                            # Use manual RGB input if available
+                            try:
+                                rgb_text = self.rgb_input.text().strip()
+                                rgb_values = tuple(int(x.strip()) for x in rgb_text.split(','))
+                                if len(rgb_values) == 3:
+                                    images = search_color(database, rgb=rgb_values, k=num_images)
+                                else:
+                                    raise ValueError("Invalid RGB format")
+                            except ValueError:
+                                QMessageBox.warning(self, "Warning", "Please enter valid RGB values (e.g., 255,128,0)")
+                                return
+                        else:
+                            # Use color picker
+                            rgb_values = (self.selected_color.red(), self.selected_color.green(), self.selected_color.blue())
+                            images = search_color(database, rgb=rgb_values, k=num_images)
+                else:
+                    # Fallback to old behavior
+                    rgb_values = (self.selected_color.red(), self.selected_color.green(), self.selected_color.blue())
+                    images = search_color(database, rgb=rgb_values, k=num_images)
+                    
+            elif search_type == "Text Search (CLIP)":
+                if hasattr(self, 'text_input') and self.text_input.text().strip():
+                    query = self.text_input.text().strip()
+                    images = search_clip(name=database, query=query, k=num_images)
+                else:
+                    print("No text query entered")
+                    return
+                    
+            elif search_type == "Image Similarity Search (DINO)":
+                if hasattr(self, 'selected_image_path') and self.selected_image_path:
+                    images = search_visual(name=database, file_path=self.selected_image_path, k=num_images)
+                else:
+                    print("No reference image selected for visual similarity")
+                    return
+                    
+            elif search_type == "Image Content Search (CLIP)":
+                if hasattr(self, 'selected_image_path') and self.selected_image_path:
+                    images = search_clip(database, query_image_path=self.selected_image_path, k=num_images)
+                else:
+                    print("No reference image selected for image search")
+                    return
+            
+            if len(images) == 0:
+                print("No images found")
+                return
+            
+            # Apply layout based on selection
+            # self.loadonce = False
+            
+            if layout_type == 0:  # Circles
+                self.circles(images)
+            elif layout_type == 1:  # Circles by Hue
+                self.circlesh(images)
+            elif layout_type == 2:  # Hexagons
+                self.hexagons(images)
+                
+        except Exception as e:
+            print(f"Error generating gallery: {e}")
     
     def calculate_bounds(self):
         
@@ -561,34 +1245,5 @@ if __name__ == "__main__":
     window = ImageGalleryApp()
     window.show()
     
-    while window.animation_time < 3:
-        app.processEvents()
-
-    print("out")
-    # start_time = time.time()
-    # add_visual(name= "pinterest", folder_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference", model= "clip")
-    # end_time = time.time()
-    # print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-    # window.animation_timer.start()
-    # window.animation_timer.stop()
-    
-    start_time = time.time()
-    # images = search_color("pinterest", path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 500)
-    # images = search_content("pinterest", query_image_path= r"gallery-dl\pinterest\sidvenkatayogii\Reference\pinterest_921478773764303738.jpg", k = 5)
-    images = search_clip("pinterest", query= "sword", k = 500)
-    end_time = time.time()
-    print(f"Elapsed time: {end_time - start_time:.3f} seconds")
-    # creates PyQt6 QImage
-    # imgqt = ImageQt(images[0])
-    # qimage = imgqt.copy()
-    # for i in images[1:]:
-    #     print(i[1])
-
-
-    window.loadonce = False
-    window.hexagons(images)
-    # print("done")
-    # window.hexagons(images)
-    # # window.circles(np.arange(0, 300))
-    # # window.hexagons(np.arange(0, 300))
+    # Remove the automatic execution code and let the GUI handle everything
     sys.exit(app.exec_())

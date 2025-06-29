@@ -1,0 +1,636 @@
+# TODO fix progress bars
+# fix double populating when generating galleries more than once when images are scaling
+# save qpixmpas to memory to be reused
+
+import sys
+import os
+import json
+from datetime import datetime
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QGridLayout, QLabel, QPushButton, 
+                             QFrame, QScrollArea, QDialog, QLineEdit, 
+                             QFileDialog, QCheckBox, QMessageBox, QComboBox)
+from PyQt5.QtGui import QPixmap, QFont, QPainter, QColor
+from PyQt5.QtCore import Qt, QSize, pyqtSignal
+
+print(5)
+
+# Import the gallery app
+from gallery import ImageGalleryApp  # Assuming your gallery code is in paste.py
+
+
+class CollectionThumbnail(QFrame):
+    """Widget representing a single collection thumbnail"""
+    clicked = pyqtSignal(dict)
+    
+    def __init__(self, collection_data, parent=None):
+        super().__init__(parent)
+        self.collection_data = collection_data
+        self.setupUI()
+        
+    def setupUI(self):
+        self.setFixedSize(200, 250)
+        self.setFrameStyle(QFrame.StyledPanel)
+        self.setStyleSheet("""
+            QFrame {
+                border: 0px solid #ddd;
+                border-radius: 8px;
+                background-color: white;
+            }
+            QFrame:hover {
+                border-color: #4CAF50;
+                background-color: #d4d4d4;
+            }
+            QFrame:hover QLabel {
+                background-color: #d4d4d4;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)  # Reduced spacing between elements
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Thumbnail image
+        self.thumbnail_label = QLabel()
+        self.thumbnail_label.setFixedSize(180, 180)
+        self.thumbnail_label.setAlignment(Qt.AlignCenter)
+        self.thumbnail_label.setStyleSheet("""
+            QLabel {
+                border: 0px solid #ccc;
+                border-radius: 4px;
+                background-color: transparent;
+            }
+        """)
+        
+        # Load thumbnail or create placeholder
+        self.loadThumbnail()
+        
+        layout.addWidget(self.thumbnail_label)
+        
+        # Collection name - no box, left aligned
+        name_label = QLabel(self.collection_data.get('name', 'Untitled'))
+        name_label.setFont(QFont("Arial", 12, QFont.Bold))
+        name_label.setAlignment(Qt.AlignLeft)
+        name_label.setWordWrap(True)
+        # Remove any styling that might create boxes or hover effects
+        name_label.setStyleSheet("border: none; background: transparent;")
+        layout.addWidget(name_label)
+        
+        # Collection info - no box, left aligned, no spacing above
+        image_count = self.collection_data.get('image_count', 0)
+        date_updated = self.collection_data.get('last_updated', '')
+        
+        info_label = QLabel(f"{image_count} Images\n{date_updated}")
+        info_label.setFont(QFont("Arial", 9))
+        info_label.setAlignment(Qt.AlignLeft)
+        info_label.setStyleSheet("color: #666; border: none; background: transparent; margin-top: 0px;")
+        layout.addWidget(info_label)
+        
+        
+    def loadThumbnail(self):
+        thumbnail_path = self.collection_data.get('thumbnail_path', '')
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            pixmap = QPixmap(thumbnail_path)
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(180, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.thumbnail_label.setPixmap(scaled_pixmap)
+                return
+        
+        # Create placeholder thumbnail
+        self.createPlaceholderThumbnail()
+    
+    def createPlaceholderThumbnail(self):
+        pixmap = QPixmap(180, 140)
+        pixmap.fill(QColor(240, 240, 240))
+        
+        painter = QPainter(pixmap)
+        painter.setPen(QColor(150, 150, 150))
+        painter.setFont(QFont("Arial", 24))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "📁")
+        painter.end()
+        
+        self.thumbnail_label.setPixmap(pixmap)
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.collection_data)
+            
+
+class CreateCollectionDialog(QDialog):
+    """Dialog for creating a new collection"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Create New Collection")
+        self.setModal(True)
+        self.setFixedSize(500, 220)
+        self.setupUI()
+        
+    def setupUI(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Main content area with two columns
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(15)
+        
+        # Left column for form fields
+        left_column = QVBoxLayout()
+        left_column.setSpacing(6)
+        
+        # Collection name section
+        left_column.addWidget(QLabel("Collection Name:"))
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Enter collection name...")
+        self.name_input.setMinimumHeight(24)
+        left_column.addWidget(self.name_input)
+        
+        # Folder section
+        left_column.addWidget(QLabel("Folder:"))
+        folder_layout = QHBoxLayout()
+        folder_layout.setSpacing(6)
+        
+        self.folder_input = QLineEdit()
+        self.folder_input.setPlaceholderText("Select folder containing images...")
+        self.folder_input.setReadOnly(True)
+        self.folder_input.setMinimumHeight(24)
+        folder_layout.addWidget(self.folder_input)
+        
+        self.browse_button = QPushButton("Browse")
+        self.browse_button.setMinimumHeight(24)
+        self.browse_button.setMaximumWidth(65)
+        self.browse_button.clicked.connect(self.selectFolder)
+        folder_layout.addWidget(self.browse_button)
+        
+        left_column.addLayout(folder_layout)
+        
+        # Include subfolders checkbox
+        self.subfolders_checkbox = QCheckBox("Include Subfolders")
+        self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
+        self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
+        left_column.addWidget(self.subfolders_checkbox)
+        
+        # Folder status label
+        self.folder_status_label = QLabel("")
+        self.folder_status_label.setWordWrap(True)
+        self.folder_status_label.setMinimumHeight(18)
+        self.folder_status_label.setStyleSheet("font-size: 10px;")
+        left_column.addWidget(self.folder_status_label)
+        
+        content_layout.addLayout(left_column, 2)
+        
+        # Right column for thumbnail and buttons
+        right_column = QVBoxLayout()
+        right_column.setSpacing(6)
+        
+        # Thumbnail preview section
+        thumbnail_label = QLabel("Thumbnail Preview")
+        thumbnail_label.setAlignment(Qt.AlignCenter)
+        thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
+        right_column.addWidget(thumbnail_label)
+        
+        self.thumbnail_preview = QLabel()
+        self.thumbnail_preview.setFixedSize(120, 90)  # Slightly larger thumbnail
+        self.thumbnail_preview.setAlignment(Qt.AlignCenter)
+        self.thumbnail_preview.setStyleSheet("""
+            QLabel {
+                border: 2px solid #ccc;
+                border-radius: 5px;
+                background-color: #f8f8f8;
+                color: #666;
+                font-size: 10px;
+            }
+        """)
+        self.thumbnail_preview.setText("No thumbnail\nselected")
+        right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
+        
+        # Add some spacing after thumbnail
+        right_column.addSpacing(6)
+        
+        self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
+        self.choose_thumbnail_button.setMinimumHeight(24)
+        self.choose_thumbnail_button.setFixedWidth(120)
+        self.choose_thumbnail_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+                font-size: 10px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        self.choose_thumbnail_button.clicked.connect(self.selectThumbnail)
+        right_column.addWidget(self.choose_thumbnail_button, 0, Qt.AlignHCenter)
+        
+        # Add spacing before buttons
+        right_column.addSpacing(12)
+        
+        # Action buttons - positioned to the right
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()  # Push buttons to the right
+        button_layout.setSpacing(8)
+        
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setMinimumHeight(26)
+        self.cancel_button.setMinimumWidth(75)
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 10px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
+        
+        self.create_button = QPushButton("Create")
+        self.create_button.setMinimumHeight(26)
+        self.create_button.setMinimumWidth(75)
+        self.create_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                font-weight: bold;
+                border-radius: 4px;
+                font-size: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.create_button.clicked.connect(self.createCollection)
+        button_layout.addWidget(self.create_button)
+        
+        right_column.addLayout(button_layout)
+        
+        # Add stretch to push everything to top
+        right_column.addStretch()
+        
+        content_layout.addLayout(right_column, 1)
+        
+        layout.addLayout(content_layout)
+        
+        # Initialize variables
+        self.selected_folder = ""
+        self.selected_thumbnail = ""
+        
+    def selectFolder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Image Folder")
+        if folder:
+            self.selected_folder = folder
+            self.folder_input.setText(folder)
+            self.updateFolderStatus()
+            
+    def selectThumbnail(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Thumbnail Image", 
+            self.selected_folder if self.selected_folder else "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.selected_thumbnail = file_path
+            self.updateThumbnailPreview()
+            
+    def updateFolderStatus(self):
+        if self.selected_folder:
+            # Count image files in folder
+            image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'}
+            image_count = 0
+            
+            if self.subfolders_checkbox.isChecked():
+                for root, dirs, files in os.walk(self.selected_folder):
+                    for file in files:
+                        if os.path.splitext(file.lower())[1] in image_extensions:
+                            image_count += 1
+            else:
+                for file in os.listdir(self.selected_folder):
+                    if os.path.isfile(os.path.join(self.selected_folder, file)):
+                        if os.path.splitext(file.lower())[1] in image_extensions:
+                            image_count += 1
+            
+            if image_count > 0:
+                self.folder_status_label.setText(f"✓ Found {image_count} images")
+                self.folder_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 10px;")
+            else:
+                self.folder_status_label.setText("⚠ No supported image files found")
+                self.folder_status_label.setStyleSheet("color: #ed1111; font-weight: bold; font-size: 10px;")
+        else:
+            self.folder_status_label.setText("")
+            
+    def updateThumbnailPreview(self):
+        if self.selected_thumbnail and os.path.exists(self.selected_thumbnail):
+            pixmap = QPixmap(self.selected_thumbnail)
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(120, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.thumbnail_preview.setPixmap(scaled_pixmap)
+                self.thumbnail_preview.setText("")  # Clear placeholder text
+                
+    def createCollection(self):
+        name = self.name_input.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Error", "Please enter a collection name.")
+            return
+            
+        if not self.selected_folder:
+            QMessageBox.warning(self, "Error", "Please select a folder.")
+            return
+            
+        if not os.path.exists(self.selected_folder):
+            QMessageBox.warning(self, "Error", "Selected folder does not exist.")
+            return
+        
+        if self.folder_status_label.setText("⚠ No supported image files found"):
+            QMessageBox.warning(self, "Error", "No supported image files found.")
+            
+        self.accept()
+        
+    def getCollectionData(self):
+        return {
+            'name': self.name_input.text().strip(),
+            'folder': self.selected_folder,
+            'subfolders': self.subfolders_checkbox.isChecked(),
+            'thumbnail_path': self.selected_thumbnail,
+            'last_updated': datetime.now().strftime("%m/%d/%Y"),
+            'created_date': datetime.now().isoformat()
+        }
+
+
+class CollectionsLandingPage(QMainWindow):
+    """Main landing page for managing collections"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Your Collections - Image Gallery")
+        self.setGeometry(100, 100, 1200, 800)
+        
+        # Collections data
+        self.collections = []
+        self.collections_file = "collections.json"
+        
+        self.setupUI()
+        self.loadCollections()
+        
+    def setupUI(self):
+        # Main widget
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        
+        # Main layout
+        main_layout = QVBoxLayout(main_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        
+        # Header
+        header_layout = QHBoxLayout()
+        
+        title_label = QLabel("Your Collections")
+        title_label.setFont(QFont("Arial", 24, QFont.Bold))
+        header_layout.addWidget(title_label)
+        
+        header_layout.addStretch()
+        
+        # Sort dropdown
+        sort_label = QLabel("Sort By:")
+        header_layout.addWidget(sort_label)
+        
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItems(["Name", "Date Created", "Date Modified", "Image Count"])
+        self.sort_combo.currentTextChanged.connect(self.sortCollections)
+        header_layout.addWidget(self.sort_combo)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Scroll area for collections
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("QScrollArea { border: none; }")
+        
+        # Collections container
+        self.collections_widget = QWidget()
+        self.collections_layout = QGridLayout(self.collections_widget)
+        self.collections_layout.setSpacing(20)
+        self.collections_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        
+        self.scroll_area.setWidget(self.collections_widget)
+        main_layout.addWidget(self.scroll_area)
+        
+        # Empty state label (hidden by default)
+        self.empty_label = QLabel("You have no collections saved. Create a new one with the + in the bottom right!")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setFont(QFont("Arial", 14))
+        self.empty_label.setStyleSheet("color: #666; margin: 50px;")
+        self.empty_label.hide()
+        main_layout.addWidget(self.empty_label)
+        
+        # Plus button (bottom right)
+        self.plus_button = QPushButton("+")
+        self.plus_button.setFixedSize(60, 60)
+        self.plus_button.setStyleSheet("""
+            QPushButton {
+                background-color: #404040;
+                color: white;
+                border: none;
+                border-radius: 30px;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #5c5c5c;
+            }
+            QPushButton:pressed {
+                background-color: #000000;
+            }
+        """)
+        self.plus_button.clicked.connect(self.createNewCollection)
+        
+        # Position plus button in bottom right
+        self.plus_button.setParent(main_widget)
+        self.plus_button.move(1120, 720)  # Adjust based on window size
+        
+    def resizeEvent(self, event):
+        # Reposition plus button when window is resized
+        super().resizeEvent(event)
+        if hasattr(self, 'plus_button'):
+            self.plus_button.move(self.width() - 80, self.height() - 80)
+            
+    def loadCollections(self):
+        """Load collections from JSON file"""
+        if os.path.exists(self.collections_file):
+            try:
+                with open(self.collections_file, 'r') as f:
+                    self.collections = json.load(f)
+            except Exception as e:
+                print(f"Error loading collections: {e}")
+                self.collections = []
+        else:
+            self.collections = []
+            
+        self.updateCollectionsDisplay()
+        
+    def saveCollections(self):
+        """Save collections to JSON file"""
+        try:
+            with open(self.collections_file, 'w') as f:
+                json.dump(self.collections, f, indent=2)
+        except Exception as e:
+            print(f"Error saving collections: {e}")
+            
+    def updateCollectionsDisplay(self):
+        """Update the display of collections"""
+        # Clear existing thumbnails
+        for i in reversed(range(self.collections_layout.count())):
+            self.collections_layout.itemAt(i).widget().setParent(None)
+            
+        if not self.collections:
+            self.scroll_area.hide()
+            self.empty_label.show()
+        else:
+            self.empty_label.hide()
+            self.scroll_area.show()
+            
+            # Add collection thumbnails
+            cols = 4  # Number of columns
+            for i, collection in enumerate(self.collections):
+                row = i // cols
+                col = i % cols
+                
+                thumbnail = CollectionThumbnail(collection)
+                thumbnail.clicked.connect(self.openCollection)
+                self.collections_layout.addWidget(thumbnail, row, col)
+                
+    def sortCollections(self, sort_by):
+        """Sort collections based on selected criteria"""
+        if sort_by == "Name":
+            self.collections.sort(key=lambda x: x.get('name', '').lower())
+        elif sort_by == "Date Created":
+            self.collections.sort(key=lambda x: x.get('created_date', ''), reverse=True)
+        elif sort_by == "Date Modified":
+            self.collections.sort(key=lambda x: x.get('last_updated', ''), reverse=True)
+        elif sort_by == "Image Count":
+            self.collections.sort(key=lambda x: x.get('image_count', 0), reverse=True)
+            
+        self.updateCollectionsDisplay()
+        
+    def createNewCollection(self):
+        """Create a new collection"""
+        dialog = CreateCollectionDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            collection_data = dialog.getCollectionData()
+            
+            # Count images in the selected folder
+            image_count = self.countImagesInFolder(
+                collection_data['folder'], 
+                collection_data['subfolders']
+            )
+            collection_data['color'] = True
+            collection_data['dino'] = False
+            collection_data['clip'] = False
+            collection_data['image_count'] = image_count
+            
+            # Add to collections
+            self.collections.append(collection_data)
+            self.saveCollections()
+            self.updateCollectionsDisplay()
+            
+            # START COLOR INDEX CREATION AUTOMATICALLY
+            self.createColorIndex(collection_data)
+            
+            # Open the new collection
+            self.openCollection(collection_data)
+
+    def createColorIndex(self, collection_data):
+        """Create color index for a collection"""
+        from accessDBs import add_color
+        import threading
+        from PyQt5.QtWidgets import QProgressDialog
+        from PyQt5.QtCore import QThread, pyqtSignal
+        
+        class IndexWorker(QThread):
+            progress = pyqtSignal(int)
+            finished = pyqtSignal()
+            
+            def __init__(self, name, folder, explore):
+                super().__init__()
+                self.name = name
+                self.folder = folder
+                self.explore = explore
+                
+            def run(self):
+                add_color(self.name, self.folder, self.explore)
+                self.finished.emit()
+        
+        # Show progress dialog
+        progress_dialog = QProgressDialog("Creating color index...", "Cancel", 0, 0, self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.show()
+        
+        # Start worker thread
+        self.index_worker = IndexWorker(
+            collection_data['name'], 
+            collection_data['folder'], 
+            collection_data['subfolders']
+        )
+        self.index_worker.finished.connect(progress_dialog.close)
+        self.index_worker.start()
+            
+    def countImagesInFolder(self, folder, include_subfolders):
+        """Count image files in a folder"""
+        image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'}
+        count = 0
+        
+        try:
+            if include_subfolders:
+                for root, dirs, files in os.walk(folder):
+                    for file in files:
+                        if os.path.splitext(file.lower())[1] in image_extensions:
+                            count += 1
+            else:
+                for file in os.listdir(folder):
+                    if os.path.isfile(os.path.join(folder, file)):
+                        if os.path.splitext(file.lower())[1] in image_extensions:
+                            count += 1
+        except Exception as e:
+            print(f"Error counting images: {e}")
+            
+        return count
+        
+    def openCollection(self, collection_data):
+        """Open a collection in the gallery view"""
+        # Create and show the gallery window
+        self.gallery_window = ImageGalleryApp(collection_data, )  # PASS COLLECTION DATA
+        self.gallery_window.show()
+        
+        # Hide the landing page
+        self.hide()
+        
+        # Connect to gallery window close event to show landing page again
+        self.gallery_window.setAttribute(Qt.WA_DeleteOnClose)
+        self.gallery_window.destroyed.connect(self.show)
+
+
+def main():
+    app = QApplication(sys.argv)
+    
+    # Set application style
+    app.setStyle('Fusion')
+    
+    window = CollectionsLandingPage()
+    window.show()
+    
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()

@@ -99,9 +99,9 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino"):
     ids = np.array(range(len(image_paths)))
     index.add_with_ids(vectors, ids)
 
-    os.makedirs("database", exist_ok=True)
-    faiss.write_index(index, f"database/{name}_{model}.index")
-    with open(f"database/{name}_{model}_paths.json", "w") as f:
+    # os.makedirs("database", exist_ok=True)
+    faiss.write_index(index, os.path.join("collections", name, f"{name}_{model}.index"))
+    with open(os.path.join("collections", name, f"{name}_{model}_paths.json"), "w") as f:
         json.dump(image_paths, f)
 
     print(f"FAISS index and paths saved for {name} using {model.upper()} model.")
@@ -129,12 +129,12 @@ def add_color(name, folder_path, explore= False):
                 db.add_hash(path, hash)
         except Exception as e:
             print(f"Error processing {path} : {e}")
-    db.save_DB()
+    db.save_DB(folder_name= name)
 
 
 def search_visual(name, file_path, k = -1):
     start_time = time.time()
-    index = faiss.read_index(f"database/{name}_dino.index")
+    index = faiss.read_index(os.path.join("collections", name, f"{name}_dino.index"))
     end_time = time.time()
     print(f"Loading time: {end_time - start_time:.3f} seconds")
 
@@ -157,7 +157,7 @@ def search_visual(name, file_path, k = -1):
     indices = indices[0]
     distances = distances[0]
     # Load the original image paths to map back to filenames
-    with open(os.path.join("database", f"{name}_dino_paths.json"), "r") as f:
+    with open(os.path.join("collections", name, f"{name}_dino_paths.json"), "r") as f:
         image_paths = json.load(f)
         
     results = []
@@ -171,7 +171,7 @@ def search_visual(name, file_path, k = -1):
 def search_clip(name, query : str, k = -1):
     start_time = time.time()
 
-    index = faiss.read_index(f"database/{name}_clip.index")
+    index = faiss.read_index(os.path.join("collections", name, f"{name}_clip.index"))
     end_time = time.time()
     print(f"Loading index time: {end_time - start_time:.3f} seconds")
 
@@ -195,7 +195,7 @@ def search_clip(name, query : str, k = -1):
     indices = indices[0]
     distances = distances[0]
 
-    with open(f"database/{name}_clip_paths.json", "r") as f:
+    with open(os.path.join("collections", name, f"{name}_clip_paths.json"), "r") as f:
         image_paths = json.load(f)
 
     results = []
@@ -241,6 +241,12 @@ def search_color(name, rgb= None, path= None, k = 5):
         return [{"path": path, "distance": 0, "colors": vec}] + images
     else:
         return [{"image": query_image, "distance": 0, "colors": vec}] + images
+
+def add_index(self, name, directory, explore, by):
+        if by == "color":
+            add_color(name=name, folder_path=directory, explore=explore)
+        else:
+            add_visual(name=name, folder_path=directory, explore=explore, model= by)
 
 if __name__ == "__main__":
     pass
