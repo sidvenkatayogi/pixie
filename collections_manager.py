@@ -108,7 +108,7 @@ class CollectionThumbnail(QFrame):
         
         painter = QPainter(pixmap)
         painter.setPen(QColor(150, 150, 150))
-        painter.setFont(QFont(self.font, 24))
+        painter.setFont(QFont("Arial", 24))
         painter.drawText(pixmap.rect(), Qt.AlignCenter, "📁")
         painter.end()
         
@@ -172,6 +172,7 @@ class CreateCollectionDialog(QDialog):
         # Include subfolders checkbox
         self.subfolders_checkbox = QCheckBox("Include Subfolders")
         self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
+
         self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
         left_column.addWidget(self.subfolders_checkbox)
         
@@ -456,7 +457,7 @@ class CollectionsLandingPage(QMainWindow):
         self.plus_button.setFixedSize(60, 60)
         self.plus_button.setStyleSheet("""
             QPushButton {
-                background-color: #404040;
+                background-color: #c2c2c2;
                 color: white;
                 border: none;
                 border-radius: 30px;
@@ -464,10 +465,10 @@ class CollectionsLandingPage(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #5c5c5c;
+                background-color: #9e9e9e;
             }
             QPushButton:pressed {
-                background-color: #000000;
+                background-color: #6b6b6b;
             }
         """)
         self.plus_button.clicked.connect(self.createNewCollection)
