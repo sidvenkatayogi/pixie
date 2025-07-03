@@ -1,6 +1,8 @@
 # TODO fix progress bars
 # fix double populating when generating galleries more than once when images are scaling
 # save qpixmpas to memory to be reused
+# edit gallery thumbnail
+# open images within gallery and show palettes
 
 import sys
 import os
@@ -10,10 +12,10 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
                              QFrame, QScrollArea, QDialog, QLineEdit, 
                              QFileDialog, QCheckBox, QMessageBox, QComboBox)
-from PyQt5.QtGui import QPixmap, QFont, QPainter, QColor
+from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
 from PyQt5.QtCore import Qt, QSize, pyqtSignal
 
-print(5)
+print(0)
 
 # Import the gallery app
 from gallery import ImageGalleryApp  # Assuming your gallery code is in paste.py
@@ -23,8 +25,9 @@ class CollectionThumbnail(QFrame):
     """Widget representing a single collection thumbnail"""
     clicked = pyqtSignal(dict)
     
-    def __init__(self, collection_data, parent=None):
+    def __init__(self, collection_data, parent=None, font="Arial"):
         super().__init__(parent)
+        self.font = font
         self.collection_data = collection_data
         self.setupUI()
         
@@ -69,7 +72,7 @@ class CollectionThumbnail(QFrame):
         
         # Collection name - no box, left aligned
         name_label = QLabel(self.collection_data.get('name', 'Untitled'))
-        name_label.setFont(QFont("Arial", 12, QFont.Bold))
+        name_label.setFont(QFont(self.font, 12, QFont.Bold))
         name_label.setAlignment(Qt.AlignLeft)
         name_label.setWordWrap(True)
         # Remove any styling that might create boxes or hover effects
@@ -81,7 +84,7 @@ class CollectionThumbnail(QFrame):
         date_updated = self.collection_data.get('last_updated', '')
         
         info_label = QLabel(f"{image_count} Images\n{date_updated}")
-        info_label.setFont(QFont("Arial", 9))
+        info_label.setFont(QFont(self.font, 9))
         info_label.setAlignment(Qt.AlignLeft)
         info_label.setStyleSheet("color: #666; border: none; background: transparent; margin-top: 0px;")
         layout.addWidget(info_label)
@@ -105,7 +108,7 @@ class CollectionThumbnail(QFrame):
         
         painter = QPainter(pixmap)
         painter.setPen(QColor(150, 150, 150))
-        painter.setFont(QFont("Arial", 24))
+        painter.setFont(QFont(self.font, 24))
         painter.drawText(pixmap.rect(), Qt.AlignCenter, "📁")
         painter.end()
         
@@ -114,13 +117,14 @@ class CollectionThumbnail(QFrame):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.collection_data)
-            
+
 
 class CreateCollectionDialog(QDialog):
     """Dialog for creating a new collection"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, font= "Arial"):
         super().__init__(parent)
+        self.font = font
         self.setWindowTitle("Create New Collection")
         self.setModal(True)
         self.setFixedSize(500, 220)
@@ -375,13 +379,26 @@ class CollectionsLandingPage(QMainWindow):
         self.setWindowTitle("Your Collections - Image Gallery")
         self.setGeometry(100, 100, 1200, 800)
         
+        self.loadCustomFont()
+
         # Collections data
         self.collections = []
         self.collections_file = "collections.json"
         
         self.setupUI()
         self.loadCollections()
-        
+
+        # self.font = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("Inter.ttc"))[0]
+        # print(self.font)
+
+    def loadCustomFont(self):
+        font_id = QFontDatabase.addApplicationFont("Inter.ttc")
+        if font_id != -1:
+            self.font = QFontDatabase.applicationFontFamilies(font_id)[0]
+        else:
+            print("Error: Could not load custom font")
+            self.font = "Arial"  # Fallback font
+
     def setupUI(self):
         # Main widget
         main_widget = QWidget()
@@ -396,7 +413,7 @@ class CollectionsLandingPage(QMainWindow):
         header_layout = QHBoxLayout()
         
         title_label = QLabel("Your Collections")
-        title_label.setFont(QFont("Arial", 24, QFont.Bold))
+        title_label.setFont(QFont(self.font, 24, QFont.Bold))
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
@@ -429,7 +446,7 @@ class CollectionsLandingPage(QMainWindow):
         # Empty state label (hidden by default)
         self.empty_label = QLabel("You have no collections saved. Create a new one with the + in the bottom right!")
         self.empty_label.setAlignment(Qt.AlignCenter)
-        self.empty_label.setFont(QFont("Arial", 14))
+        self.empty_label.setFont(QFont(self.font, 14))
         self.empty_label.setStyleSheet("color: #666; margin: 50px;")
         self.empty_label.hide()
         main_layout.addWidget(self.empty_label)
@@ -506,7 +523,7 @@ class CollectionsLandingPage(QMainWindow):
                 row = i // cols
                 col = i % cols
                 
-                thumbnail = CollectionThumbnail(collection)
+                thumbnail = CollectionThumbnail(collection, font= self.font)
                 thumbnail.clicked.connect(self.openCollection)
                 self.collections_layout.addWidget(thumbnail, row, col)
                 
@@ -525,7 +542,7 @@ class CollectionsLandingPage(QMainWindow):
         
     def createNewCollection(self):
         """Create a new collection"""
-        dialog = CreateCollectionDialog(self)
+        dialog = CreateCollectionDialog(self, font= self.font)
         if dialog.exec_() == QDialog.Accepted:
             collection_data = dialog.getCollectionData()
             
@@ -609,7 +626,7 @@ class CollectionsLandingPage(QMainWindow):
     def openCollection(self, collection_data):
         """Open a collection in the gallery view"""
         # Create and show the gallery window
-        self.gallery_window = ImageGalleryApp(collection_data, )  # PASS COLLECTION DATA
+        self.gallery_window = ImageGalleryApp(collection_data, parent=self)  # PASS COLLECTION DATA
         self.gallery_window.show()
         
         # Hide the landing page
@@ -634,3 +651,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("done")
