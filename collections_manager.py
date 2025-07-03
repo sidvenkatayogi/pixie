@@ -457,7 +457,7 @@ class CollectionsLandingPage(QMainWindow):
         self.plus_button.setFixedSize(60, 60)
         self.plus_button.setStyleSheet("""
             QPushButton {
-                background-color: #c2c2c2;
+                background-color: #9e9e9e;
                 color: white;
                 border: none;
                 border-radius: 30px;
@@ -465,10 +465,10 @@ class CollectionsLandingPage(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #9e9e9e;
+                background-color: #6b6b6b;
             }
             QPushButton:pressed {
-                background-color: #6b6b6b;
+                background-color: #3d3d3d;
             }
         """)
         self.plus_button.clicked.connect(self.createNewCollection)
