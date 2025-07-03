@@ -1,6 +1,3 @@
-# TODO
-# us QThreads
-
 import sys
 import os
 import numpy as np
@@ -30,6 +27,10 @@ from tqdm import tqdm
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
+
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         # smooth rendering and scaling
         self.setRenderHint(QPainter.Antialiasing)
         self.setRenderHint(QPainter.SmoothPixmapTransform)
@@ -104,8 +105,10 @@ class CustomGraphicsView(QGraphicsView):
 
 
 class ImageGalleryApp(QMainWindow):
-    def __init__(self, collection_data):
-        super().__init__()
+    def __init__(self, collection_data,  parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.font = parent.font
         self.collection_data = collection_data
         self.current_search_mode = "browse"  # browse, color, clip, dino
         self.setWindowTitle("Image Gallery")
@@ -132,23 +135,89 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_target_rect = QRectF()
         self.zoom_animating = False
 
-        self.selected_color = QColor(255, 0, 0)  # Default red
+        self.selected_color = QColor(0, 0, 0)  # Default white
         self.selected_image_path = ""
         
         self.setupUI()
-    
+
+    def returnToHome(self):
+        if self.parent:
+            self.parent.show()
+        self.close()
+
+    # def setupUI(self):
+    #     main_widget = QWidget()
+    #     main_layout = QHBoxLayout(main_widget)
+        
+    #     # graphics view (left side)
+    #     main_layout.addWidget(self.view, 3)  # Give more space to the view
+        
+    #     # Control panel (right side)
+    #     control_panel = self.createControlPanel()
+    #     main_layout.addWidget(control_panel, 1)  # Smaller space for controls
+        
+    #     self.setCentralWidget(main_widget)
     def setupUI(self):
         main_widget = QWidget()
         main_layout = QHBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
         
-        # graphics view (left side)
-        main_layout.addWidget(self.view, 3)  # Give more space to the view
+        # Create view container
+        view_container = QWidget()
+        view_layout = QVBoxLayout(view_container)
+        view_layout.setContentsMargins(0, 0, 0, 0)
         
+        # Add view to container
+        view_layout.addWidget(self.view)
+        
+        # Create and style toggle button
+        self.toggle_panel_button = QPushButton(">")
+        self.toggle_panel_button.setFont(QFont(self.font, 12))
+        self.toggle_panel_button.setFixedSize(24, 24)
+        self.toggle_panel_button.clicked.connect(self.toggleControlPanel)
+        self.toggle_panel_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(240, 240, 240, 180);
+                border: 2px solid #616161;
+                border-radius: 4px;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: rgba(224, 224, 224, 220);
+            }
+        """)
+        
+        # Create a parent widget for the button and set its layout
+        button_widget = QWidget(self.view)
+        button_layout = QHBoxLayout(button_widget)
+        button_layout.setContentsMargins(10, 10, 10, 10)
+        button_layout.addWidget(self.toggle_panel_button)
+        button_layout.addStretch()
+        
+        # Position the button widget in the top-right corner
+        button_widget.setGeometry(self.view.width() - 44, 0, 44, 44)
+        
+        # Make button widget stay in top-right corner when view is resized
+        self.view.resizeEvent = lambda e: button_widget.setGeometry(
+            self.view.width() - 44, 0, 44, 44
+        )
+        
+        # Add view container and control panel to main layout
+        main_layout.addWidget(view_container, 3)
+
         # Control panel (right side)
-        control_panel = self.createControlPanel()
-        main_layout.addWidget(control_panel, 1)  # Smaller space for controls
+        self.control_panel = self.createControlPanel()
+        main_layout.addWidget(self.control_panel, 1)
         
         self.setCentralWidget(main_widget)
+
+    def toggleControlPanel(self):
+        if self.control_panel.isVisible():
+            self.control_panel.hide()
+            self.toggle_panel_button.setText("<")  # Left arrow to show
+        else:
+            self.control_panel.show()
+            self.toggle_panel_button.setText(">")  # Right arrow to hide
 
     def createControlPanel(self):
         control_frame = QFrame()
@@ -157,19 +226,49 @@ class ImageGalleryApp(QMainWindow):
         control_frame.setMaximumWidth(350)
         
         layout = QVBoxLayout(control_frame)
+
+        home_button_layout = QHBoxLayout()
+        home_button_layout.addStretch(3)  # Push button to right
+
+        self.home_button = QPushButton("Back to Home")
+        self.home_button.setFont(QFont(self.font, 15))
         
+        self.home_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.home_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                color: black;
+                border: 2px solid #616161;
+                padding: 8px;
+                font-size: 15px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #d6d6d6;
+            }
+        """)
+
+        self.home_button.clicked.connect(self.returnToHome)
+        home_button_layout.addWidget(self.home_button)
+        layout.addLayout(home_button_layout)
+
         title = QLabel("Gallery Controls")
-        title.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
+        title.setFont(QFont(self.font, 16, QFont.Bold))
+        title.setStyleSheet("margin: 10px;")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
         layout_group = QGroupBox("Layout Type")
+        layout_group.setFont(QFont(self.font, 11))
         layout_group_layout = QVBoxLayout(layout_group)
         
         self.layout_buttons = QButtonGroup()
         self.circles_radio = QRadioButton("Circles")
+        self.circles_radio.setFont(QFont(self.font, 11))
         self.circlesh_radio = QRadioButton("Circles by Hue")
+        self.circlesh_radio.setFont(QFont(self.font, 11))
         self.hexagons_radio = QRadioButton("Hexagons")
+        self.hexagons_radio.setFont(QFont(self.font, 11))
         
         self.circles_radio.setChecked(True)  # default
         
@@ -183,7 +282,9 @@ class ImageGalleryApp(QMainWindow):
         
         layout.addWidget(layout_group)
         
-        layout.addWidget(QLabel("Number of Images:"))
+        image_count_label = QLabel("Number of Images:")
+        image_count_label.setFont(QFont(self.font, 11))
+        layout.addWidget(image_count_label)
         self.image_count_slider = QSlider(Qt.Horizontal)
         self.image_count_slider.setMinimum(2)
         self.image_count_slider.setMaximum(self.collection_data["image_count"])
@@ -191,6 +292,7 @@ class ImageGalleryApp(QMainWindow):
         self.image_count_slider.valueChanged.connect(self.updateImageCountLabel)
         
         self.image_count_label = QLabel(str(max(2, int(self.collection_data["image_count"] * 0.5))))
+        self.image_count_label.setFont(QFont(self.font, 11))
         self.image_count_label.setAlignment(Qt.AlignCenter)
         
         layout.addWidget(self.image_count_slider)
@@ -207,10 +309,12 @@ class ImageGalleryApp(QMainWindow):
         
         if not self.collection_data["clip"]:
             self.create_clip_btn = QPushButton("Create CLIP Index")
+            self.create_clip_btn.setFont(QFont(self.font, 11))
             self.create_clip_btn.clicked.connect(lambda: self.createIndex("clip"))
             search_layout.addWidget(self.create_clip_btn)
         if not self.collection_data["dino"]:
             self.create_dino_btn = QPushButton("Create DINO Index")
+            self.create_dino_btn.setFont(QFont(self.font, 11))
             self.create_dino_btn.clicked.connect(lambda: self.createIndex("dino"))
             create_index_layout.addWidget(self.create_dino_btn)
             search_layout.addWidget(self.create_index_widget)
@@ -221,10 +325,12 @@ class ImageGalleryApp(QMainWindow):
 
         # Search type selection
         search_group = QGroupBox("Search Type")
+        search_group.setFont(QFont(self.font, 12))
         search_group_layout = QVBoxLayout(search_group)
         
         # Modify the search type combo box population
         self.search_type_combo = QComboBox()
+        self.search_type_combo.setFont(QFont(self.font, 11))
         search_types = ["Color Search"]  # Color search always available
 
         # Add CLIP text search if supported
@@ -251,29 +357,31 @@ class ImageGalleryApp(QMainWindow):
         self.setupColorSearchControls()
 
         self.loadonce_checkbox = QCheckBox("Load all images at once")
+        self.loadonce_checkbox.setFont(QFont(self.font, 11))
         self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
         layout.addWidget(self.loadonce_checkbox)
         
-        # Database selection
-        layout.addWidget(QLabel("Database:"))
-        self.database_combo = QComboBox()
-        self.database_combo.addItems([self.collection_data["name"]])  # Add more databases as needed
-        layout.addWidget(self.database_combo)
+        # # Database selection
+        # layout.addWidget(QLabel("Database:"))
+        # self.database_combo = QComboBox()
+        # self.database_combo.addItems([self.collection_data["name"]])  # Add more databases as needed
+        # layout.addWidget(self.database_combo)
         
         # Generate button
         self.generate_button = QPushButton("Generate Gallery")
+        self.generate_button.setFont(QFont(self.font, 14))
         self.generate_button.setStyleSheet("""
             QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
+                background-color: #e0ffe0;
+                color: #3d8b40;
+                border: 2px solid #79b879;
                 padding: 10px;
                 font-size: 14px;
                 font-weight: bold;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #79b879;
             }
             QPushButton:pressed {
                 background-color: #3d8b40;
@@ -284,17 +392,22 @@ class ImageGalleryApp(QMainWindow):
         
         # Clear button
         self.clear_button = QPushButton("Clear Gallery")
+        self.clear_button.setFont(QFont(self.font, 14))
         self.clear_button.setStyleSheet("""
             QPushButton {
-                background-color: #f44336;
-                color: white;
-                border: none;
+                background-color: #ffe0e0;
+                color: #872222;
+                border: 2px solid #9c5959;
                 padding: 8px;
-                font-size: 12px;
+                font-size: 14px;
+                font-weight: bold;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #da190b;
+                background-color: #9c5959;
+            }
+            QPushButton:pressed {
+                background-color: #872222;
             }
         """)
         self.clear_button.clicked.connect(self.clearGallery)
@@ -341,9 +454,11 @@ class ImageGalleryApp(QMainWindow):
         
         # Color search mode selection
         mode_label = QLabel("Search by:")
+        mode_label.setFont(QFont(self.font, 11))
         self.search_controls_layout.addWidget(mode_label)
         
         self.color_search_mode = QComboBox()
+        self.color_search_mode.setFont(QFont(self.font, 11))
         self.color_search_mode.addItems(["RGB Color Picker", "Reference Image"])
         self.color_search_mode.currentTextChanged.connect(self.onColorSearchModeChanged)
         self.search_controls_layout.addWidget(self.color_search_mode)
@@ -359,19 +474,23 @@ class ImageGalleryApp(QMainWindow):
     def setupColorImageControls(self):
         # Image selector
         image_label = QLabel("Reference Image:")
+        image_label.setFont(QFont(self.font, 11))
         self.color_controls_layout.addWidget(image_label)
         
         self.color_image_path_label = QLabel("No image selected")
+        self.color_image_path_label.setFont(QFont(self.font, 10))
         self.color_image_path_label.setWordWrap(True)
-        self.color_image_path_label.setStyleSheet("border: 1px solid #ccc; padding: 5px; background-color: #f9f9f9;")
+        self.color_image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
         self.color_controls_layout.addWidget(self.color_image_path_label)
         
         self.select_color_image_button = QPushButton("Select Image")
+        self.select_color_image_button.setFont(QFont(self.font, 11))
         self.select_color_image_button.clicked.connect(self.selectColorImage)
         self.color_controls_layout.addWidget(self.select_color_image_button)
     def setupColorPickerControls(self):
         # Color picker button
         color_label = QLabel("Select Color:")
+        color_label.setFont(QFont(self.font, 11))
         self.color_controls_layout.addWidget(color_label)
         
         self.color_button = QPushButton()
@@ -407,9 +526,11 @@ class ImageGalleryApp(QMainWindow):
         
         # Text input
         text_label = QLabel("Search Query:")
+        text_label.setFont(QFont(self.font, 11))
         self.search_controls_layout.addWidget(text_label)
         
         self.text_input = QLineEdit()
+        self.text_input.setFont(QFont(self.font, 11))
         self.text_input.setPlaceholderText("Enter search text...")
         self.search_controls_layout.addWidget(self.text_input)
     
@@ -418,14 +539,17 @@ class ImageGalleryApp(QMainWindow):
         
         # Image selector
         image_label = QLabel("Reference Image:")
+        image_label.setFont(QFont(self.font, 11))
         self.search_controls_layout.addWidget(image_label)
         
         self.image_path_label = QLabel("No image selected")
+        self.image_path_label.setFont(QFont(self.font, 11))
         self.image_path_label.setWordWrap(True)
-        self.image_path_label.setStyleSheet("border: 1px solid #ccc; padding: 5px; background-color: #f9f9f9;")
+        self.image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
         self.search_controls_layout.addWidget(self.image_path_label)
         
         self.select_image_button = QPushButton("Select Image")
+        self.select_image_button.setFont(QFont(self.font, 11))
         self.select_image_button.clicked.connect(self.selectImage)
         self.search_controls_layout.addWidget(self.select_image_button)
     
@@ -861,12 +985,11 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_duration = duration_ms
         self.zoom_start_scale = start_scale
         self.zoom_elapsed = 0
+        # self.zoom_animating = self.loadonce
         self.zoom_animating = True
-        
-        start_rect = QRectF(0, 0,
-            self.zoom_target_rect.width() * start_scale,
-            self.zoom_target_rect.height() * start_scale
-        )
+        sw = self.zoom_target_rect.width() * start_scale
+        sh = self.zoom_target_rect.height() * start_scale
+        start_rect = QRectF(-sw/2,-sh/2,sw,sh)
         
         self.view.fitInView(start_rect, Qt.KeepAspectRatio)
         
@@ -901,7 +1024,10 @@ class ImageGalleryApp(QMainWindow):
 
     def animate_zoom_delayed(self, delay_ms=100, duration_ms=2500):
         def x():
-            self.start_zoom(duration_ms=duration_ms)
+            if self.loadonce:
+                self.start_zoom(duration_ms=duration_ms)
+            else:
+                return
         
         QTimer.singleShot(delay_ms, x)
 
@@ -918,7 +1044,7 @@ class ImageGalleryApp(QMainWindow):
 
         painter = QPainter(image)
         painter.setPen(Qt.black) # Text color
-        painter.setFont(QFont("Arial", 20))
+        painter.setFont(QFont(self.font, 20))
         painter.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, text)
         painter.end()
 
