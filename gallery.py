@@ -20,6 +20,9 @@ from colors import get_dominant_colors
 
 import PIL
 from PIL import Image
+
+from colorpicker import colorPicker
+import vcolorpicker
 # from PIL.ImageQt import ImageQt # only works for PyQt6
 
 from tqdm import tqdm
@@ -683,11 +686,25 @@ class ImageGalleryApp(QMainWindow):
             self.setupImageSearchControls()
     
     def selectColor(self):
-        color = QColorDialog.getColor(self.selected_color, self, "Select Color")
+        # color = QColorDialog.getColor(self.selected_color, self, "Select Color")
+        color = colorPicker.getColor(self.selected_color, self, "Select Color")
         if color.isValid():
             self.selected_color = color
             self.color_button.setStyleSheet(f"background-color: {color.name()}; border: 2px solid #666;")
-    
+
+        # vcolorpicker.useLightTheme(True)
+        # current_rgb = (self.selected_color.red(), 
+        #           self.selected_color.green(), 
+        #           self.selected_color.blue())
+        # color = vcolorpicker.getColor(current_rgb)  # Pass RGB tuple instead of QColor
+        # if color:  # vcolorpicker returns None if canceled
+        #     # Convert float RGB values (0-1) to integer RGB values (0-255)
+        #     rgb_int = tuple(int(c) for c in color)
+        #     self.selected_color = QColor(*rgb_int)  # Convert RGB tuple back to QColor
+        #     self.color_button.setStyleSheet(
+        #         f"background-color: {self.selected_color.name()}; border: 2px solid #666;"
+        #     )
+        
     def selectImage(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, 

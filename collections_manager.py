@@ -5,6 +5,7 @@
 # progress bar for color making
 # add collection_id so renaming doesn't change files or folders for indexes
 # check y its taking so long to open imagaes
+# fix color picker
 
 import sys
 import os
