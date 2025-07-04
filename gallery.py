@@ -105,10 +105,10 @@ class CustomGraphicsView(QGraphicsView):
 
 
 class ImageGalleryApp(QMainWindow):
-    def __init__(self, collection_data,  parent=None):
-        super().__init__(parent)
-        self.parent = parent
-        self.font = parent.font
+    def __init__(self, collection_data, font= "Arial"):
+        super().__init__()
+        self.font = font
+        self.landing_page = None
         self.collection_data = collection_data
         self.current_search_mode = "browse"  # browse, color, clip, dino
         self.setWindowTitle("Image Gallery")
@@ -141,8 +141,8 @@ class ImageGalleryApp(QMainWindow):
         self.setupUI()
 
     def returnToHome(self):
-        if self.parent:
-            self.parent.show()
+        if self.landing_page:
+            self.landing_page.show()
         self.close()
 
     # def setupUI(self):
@@ -298,6 +298,65 @@ class ImageGalleryApp(QMainWindow):
         layout.addWidget(self.image_count_slider)
         layout.addWidget(self.image_count_label)
         
+        size_container = QWidget()
+        size_layout = QHBoxLayout(size_container)
+        size_layout.setContentsMargins(0, 0, 0, 0)
+
+        size_label = QLabel("Image Size:")
+        size_label.setFont(QFont(self.font, 11))
+        size_layout.addWidget(size_label)
+
+        self.size_input = QLineEdit()
+        self.size_input.setFont(QFont(self.font, 11))
+        self.size_input.setText(str(self.STD_SIZE))
+        self.size_input.setFixedWidth(70)
+        self.size_input.setAlignment(Qt.AlignRight)
+        # self.size_input.textChanged.connect(self.onSizeChanged)
+        size_layout.addWidget(self.size_input)
+
+        size_layout.addWidget(QLabel("px"))  # Add px label
+        layout.addWidget(size_container)
+
+        self.loadonce_checkbox = QCheckBox("Load all images at once")
+        self.loadonce_checkbox.setFont(QFont(self.font, 11))
+        self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
+        layout.addWidget(self.loadonce_checkbox)
+        
+            
+        # # Create container for load/size options
+        # options_container = QWidget()
+        # options_layout = QHBoxLayout(options_container)
+        # options_layout.setContentsMargins(0, 0, 0, 0)
+        # # Add checkbox to left side
+        # self.loadonce_checkbox = QCheckBox("Load all at once")
+        # self.loadonce_checkbox.setFont(QFont(self.font, 11))
+        # self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
+        # options_layout.addWidget(self.loadonce_checkbox)
+        # # Add size input to right side
+        # size_container = QWidget()
+        # size_layout = QHBoxLayout(size_container)
+        # size_layout.setContentsMargins(0, 0, 0, 0)
+
+        # size_label = QLabel("Image Size:")
+        # size_label.setFont(QFont(self.font, 11))
+        # size_layout.addWidget(size_label)
+
+        # self.size_input = QLineEdit()
+        # self.size_input.setFont(QFont(self.font, 11))
+        # self.size_input.setText(str(self.STD_SIZE))
+        # self.size_input.setFixedWidth(70)
+        # self.size_input.setAlignment(Qt.AlignRight)
+        # # self.size_input.textChanged.connect(self.onSizeChanged)
+        # size_layout.addWidget(self.size_input)
+        # pxlabel = QLabel("px")
+        # pxlabel.setFont(QFont(self.font, 11))
+        # size_layout.addWidget(pxlabel)
+        # options_layout.addWidget(size_container)
+
+
+        # # Add the container to main layout
+        # layout.addWidget(options_container)
+
         # ADD THE SEARCH/LOAD SECTION HERE
         self.search_frame = QFrame()
         self.search_frame.setFrameStyle(QFrame.StyledPanel)
@@ -356,16 +415,6 @@ class ImageGalleryApp(QMainWindow):
         # Initialize with color search controls
         self.setupColorSearchControls()
 
-        self.loadonce_checkbox = QCheckBox("Load all images at once")
-        self.loadonce_checkbox.setFont(QFont(self.font, 11))
-        self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
-        layout.addWidget(self.loadonce_checkbox)
-        
-        # # Database selection
-        # layout.addWidget(QLabel("Database:"))
-        # self.database_combo = QComboBox()
-        # self.database_combo.addItems([self.collection_data["name"]])  # Add more databases as needed
-        # layout.addWidget(self.database_combo)
         
         # Generate button
         self.generate_button = QPushButton("Generate Gallery")
@@ -419,6 +468,27 @@ class ImageGalleryApp(QMainWindow):
         
         return control_frame
     
+    # def onSizeChanged(self, text):
+    #     """Handle image size input changes"""
+    #     try:
+    #         size = int(text)
+    #         # if 64 <= size <= 2048:  # Reasonable size limits
+                
+    #             # # Clear gallery if any images are displayed
+    #             # if len(self.image_data) > 0:
+    #             #     self.clearGallery()
+    #         if size > 2048:
+    #             self.STD_SIZE = 2048
+    #         elif size < 64:
+    #             self.STD_SIZE = 64
+    #         else:
+    #             self.STD_SIZE = size
+
+    #         self.STD_SPACE = self.STD_SIZE * 1.25
+    #         self.size_input.setText(str(self.STD_SIZE))
+        
+    #     except ValueError:
+    #         pass  # Invalid input, ignore
 
     def onRGBInputChanged(self, text):
         try:
@@ -869,7 +939,30 @@ class ImageGalleryApp(QMainWindow):
         database = self.collection_data["name"]
         search_type = self.search_type_combo.currentText()
         layout_type = self.layout_buttons.checkedId()
+        image_size = self.size_input.text()
+
+        try:
+            image_size = int(image_size)
+            # if 64 <= size <= 2048:  # Reasonable size limits
+                
+                # # Clear gallery if any images are displayed
+                # if len(self.image_data) > 0:
+                #     self.clearGallery()
+            if image_size > 2048:
+                self.STD_SIZE = 2048
+            elif image_size < 64:
+                self.STD_SIZE = 64
+            else:
+                self.STD_SIZE = image_size
+
+            self.STD_SPACE = self.STD_SIZE * 1.25
+            
         
+        except ValueError:
+            pass  # Invalid input, ignore
+
+        self.size_input.setText(str(self.STD_SIZE))
+
         try:
             # Perform search based on type
             images = []

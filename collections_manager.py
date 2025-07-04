@@ -3,6 +3,7 @@
 # save qpixmpas to memory to be reused
 # edit gallery thumbnail
 # open images within gallery and show palettes
+# progress bar for color making
 
 import sys
 import os
@@ -11,7 +12,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
                              QFrame, QScrollArea, QDialog, QLineEdit, 
-                             QFileDialog, QCheckBox, QMessageBox, QComboBox)
+                             QFileDialog, QCheckBox, QMessageBox, QComboBox, QMenu, QInputDialog, QMessageBox)
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
 from PyQt5.QtCore import Qt, QSize, pyqtSignal
 
@@ -24,6 +25,7 @@ from gallery import ImageGalleryApp  # Assuming your gallery code is in paste.py
 class CollectionThumbnail(QFrame):
     """Widget representing a single collection thumbnail"""
     clicked = pyqtSignal(dict)
+    collection_updated = pyqtSignal()  # New signal for updates
     
     def __init__(self, collection_data, parent=None, font="Arial"):
         super().__init__(parent)
@@ -50,10 +52,10 @@ class CollectionThumbnail(QFrame):
         """)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(0)  # Reduced spacing between elements
+        layout.setSpacing(0)
         layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Thumbnail image
+
+        # Add thumbnail label first
         self.thumbnail_label = QLabel()
         self.thumbnail_label.setFixedSize(180, 180)
         self.thumbnail_label.setAlignment(Qt.AlignCenter)
@@ -64,30 +66,80 @@ class CollectionThumbnail(QFrame):
                 background-color: transparent;
             }
         """)
-        
-        # Load thumbnail or create placeholder
-        self.loadThumbnail()
-        
         layout.addWidget(self.thumbnail_label)
-        
-        # Collection name - no box, left aligned
+        self.loadThumbnail()  # Load thumbnail right after creating label
+
+        # Then create info container
+        info_container = QWidget()
+        info_layout = QVBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 5, 0, 0)  # Added top margin
+        info_layout.setSpacing(0)
+
+        # Collection name
         name_label = QLabel(self.collection_data.get('name', 'Untitled'))
         name_label.setFont(QFont(self.font, 12, QFont.Bold))
         name_label.setAlignment(Qt.AlignLeft)
         name_label.setWordWrap(True)
-        # Remove any styling that might create boxes or hover effects
         name_label.setStyleSheet("border: none; background: transparent;")
-        layout.addWidget(name_label)
-        
-        # Collection info - no box, left aligned, no spacing above
+        info_layout.addWidget(name_label)
+
+        # Bottom row for info and menu button
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+
+        # Collection info
         image_count = self.collection_data.get('image_count', 0)
         date_updated = self.collection_data.get('last_updated', '')
-        
         info_label = QLabel(f"{image_count} Images\n{date_updated}")
         info_label.setFont(QFont(self.font, 9))
         info_label.setAlignment(Qt.AlignLeft)
-        info_label.setStyleSheet("color: #666; border: none; background: transparent; margin-top: 0px;")
-        layout.addWidget(info_label)
+        info_label.setStyleSheet("color: #666; border: none; background: transparent;")
+        bottom_row.addWidget(info_label)
+
+        # Menu button
+        self.menu_button = QPushButton("Edit")
+        self.menu_button.setFont(QFont(self.font, 9))
+        self.menu_button.setFixedSize(40, 32)
+        self.menu_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0);
+                border: none;
+                border-radius: 3px;
+                font-size: 12px;
+                color: #666;
+                margin-top: 11px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.9);
+            }
+        """)
+        self.menu_button.clicked.connect(self.showMenu)
+        bottom_row.addWidget(self.menu_button)
+
+        # Add bottom row to info layout
+        info_layout.addLayout(bottom_row)
+        
+        # Add info container to main layout
+        layout.addWidget(info_container)
+        
+        # # Collection name - no box, left aligned
+        # name_label = QLabel(self.collection_data.get('name', 'Untitled'))
+        # name_label.setFont(QFont(self.font, 12, QFont.Bold))
+        # name_label.setAlignment(Qt.AlignLeft)
+        # name_label.setWordWrap(True)
+        # # Remove any styling that might create boxes or hover effects
+        # name_label.setStyleSheet("border: none; background: transparent;")
+        # layout.addWidget(name_label)
+        
+        # # Collection info - no box, left aligned, no spacing above
+        # image_count = self.collection_data.get('image_count', 0)
+        # date_updated = self.collection_data.get('last_updated', '')
+        
+        # info_label = QLabel(f"{image_count} Images\n{date_updated}")
+        # info_label.setFont(QFont(self.font, 9))
+        # info_label.setAlignment(Qt.AlignLeft)
+        # info_label.setStyleSheet("color: #666; border: none; background: transparent; margin-top: 0px;")
+        # layout.addWidget(info_label)
         
         
     def loadThumbnail(self):
@@ -101,7 +153,66 @@ class CollectionThumbnail(QFrame):
         
         # Create placeholder thumbnail
         self.createPlaceholderThumbnail()
-    
+
+    def showMenu(self):
+        menu = QMenu(self)
+        menu.setFont(QFont(self.font, 10))
+        rename_action = menu.addAction("Rename Collection")
+        change_thumb_action = menu.addAction("Change Thumbnail")
+        
+        action = menu.exec_(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
+        
+        if action == rename_action:
+            self.renameCollection()
+        elif action == change_thumb_action:
+            self.changeThumbnail()
+
+    def renameCollection(self):
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "Rename Collection",
+            "Enter new name:",
+            QLineEdit.Normal,
+            self.collection_data['name']
+        )
+        if ok and len(new_name.strip()) > 0:
+            old_name = self.collection_data['name']  # Store old name before updating
+            self.collection_data['name'] = new_name.strip()
+            self.updateCollectionsFile(old_name)  # Pass old name to update method
+            self.collection_updated.emit()
+
+    def changeThumbnail(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select New Thumbnail",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        
+        if file_path:
+            self.collection_data['thumbnail_path'] = file_path
+            self.loadThumbnail()
+            self.updateCollectionsFile()
+            self.collection_updated.emit()
+
+    def updateCollectionsFile(self, old_name):
+        """Update collection in json file using old name to find the correct entry"""
+        try:
+            with open('collections.json', 'r') as f:
+                collections = json.load(f)
+                
+            for i, collection in enumerate(collections):
+                if collection['name'] == old_name:  # Match using old name
+                    collections[i] = self.collection_data
+                    break
+                    
+            with open('collections.json', 'w') as f:
+                json.dump(collections, f, indent=2)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update collection: {str(e)}")
+
+
     def createPlaceholderThumbnail(self):
         pixmap = QPixmap(180, 140)
         pixmap.fill(QColor(240, 240, 240))
@@ -524,8 +635,9 @@ class CollectionsLandingPage(QMainWindow):
                 row = i // cols
                 col = i % cols
                 
-                thumbnail = CollectionThumbnail(collection, font= self.font)
+                thumbnail = CollectionThumbnail(collection, font=self.font)
                 thumbnail.clicked.connect(self.openCollection)
+                thumbnail.collection_updated.connect(self.loadCollections)  # Refresh when updated
                 self.collections_layout.addWidget(thumbnail, row, col)
                 
     def sortCollections(self, sort_by):
@@ -625,15 +737,18 @@ class CollectionsLandingPage(QMainWindow):
         return count
         
     def openCollection(self, collection_data):
-        """Open a collection in the gallery view"""
-        # Create and show the gallery window
-        self.gallery_window = ImageGalleryApp(collection_data, parent=self)  # PASS COLLECTION DATA
-        self.gallery_window.show()
+        # Create gallery window without parent
+        self.gallery_window = ImageGalleryApp(collection_data)  # Remove parent parameter
         
-        # Hide the landing page
+        # Set window flags to make it appear in taskbar
+        self.gallery_window.setWindowFlags(Qt.Window)
+        
+        # Store reference to landing page instead of parent
+        self.gallery_window.landing_page = self
+        
+        self.gallery_window.show()
         self.hide()
         
-        # Connect to gallery window close event to show landing page again
         self.gallery_window.setAttribute(Qt.WA_DeleteOnClose)
         self.gallery_window.destroyed.connect(self.show)
 
