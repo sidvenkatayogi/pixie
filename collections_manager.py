@@ -1,9 +1,10 @@
 # TODO fix progress bars
 # fix double populating when generating galleries more than once when images are scaling
 # save qpixmpas to memory to be reused
-# edit gallery thumbnail
-# open images within gallery and show palettes
+# show palettes
 # progress bar for color making
+# add collection_id so renaming doesn't change files or folders for indexes
+# check y its taking so long to open imagaes
 
 import sys
 import os
@@ -157,14 +158,16 @@ class CollectionThumbnail(QFrame):
     def showMenu(self):
         menu = QMenu(self)
         menu.setFont(QFont(self.font, 10))
-        rename_action = menu.addAction("Rename Collection")
+        # rename_action = menu.addAction("Rename Collection")
         change_thumb_action = menu.addAction("Change Thumbnail")
         
         action = menu.exec_(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
         
-        if action == rename_action:
-            self.renameCollection()
-        elif action == change_thumb_action:
+        # if action == rename_action:
+        #     self.renameCollection()
+        # elif action == change_thumb_action:
+        #     self.changeThumbnail()
+        if action == change_thumb_action:
             self.changeThumbnail()
 
     def renameCollection(self):

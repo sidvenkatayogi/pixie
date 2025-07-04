@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
                              QHBoxLayout, QWidget, QPushButton, QSlider, QLabel,
                              QLineEdit, QComboBox, QFileDialog, QFrame, QColorDialog,
                              QButtonGroup, QRadioButton, QGroupBox, QSpacerItem,
-                             QSizePolicy, QProgressDialog, QMessageBox, QCheckBox)
+                             QSizePolicy, QProgressDialog, QMessageBox, QCheckBox, QMenu)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize, QThread
 import time
@@ -137,9 +137,54 @@ class ImageGalleryApp(QMainWindow):
 
         self.selected_color = QColor(0, 0, 0)  # Default white
         self.selected_image_path = ""
-        
+
+        self.scene.contextMenuEvent = self.sceneContextMenuEvent
+
         self.setupUI()
 
+    def sceneContextMenuEvent(self, event):
+        """Handle right-click context menu in scene"""
+        # Get item under cursor
+        item = self.scene.itemAt(event.scenePos(), self.view.transform())
+        if isinstance(item, QGraphicsPixmapItem) and self.image_data[item]["path"]:
+            # Find the image path for this item
+            # for data_item, data in self.image_data.items():
+            #     if data_item == item:
+                    path = self.image_data[item]["path"]
+                    # Create context menu
+                    menu = QMenu()
+                    open_file = menu.addAction("Open Image")
+                    open_location = menu.addAction("Show in Folder")
+                    
+                    # Show menu and get selected action
+                    action = menu.exec_(event.screenPos())
+                    
+                    if action == open_file:
+                        self.openImage(path)
+                    elif action == open_location:
+                        self.showInFolder(path)
+
+    def openImage(self, path):
+        """Open image with default system viewer"""
+        if path:
+            import subprocess
+            import os
+            if os.name == 'nt':  # Windows
+                os.startfile(path)
+            else:  # macOS and Linux
+                subprocess.call(('xdg-open', path))
+
+    def showInFolder(self, path):
+        """Show image in its folder"""
+        if path:
+            import subprocess
+            import os
+            if os.name == 'nt':  # Windows
+                subprocess.run(['explorer', '/select,', os.path.normpath(path)])
+            elif os.name == 'darwin':  # macOS
+                subprocess.run(['open', '-R', path])
+            else:  # Linux
+                subprocess.run(['xdg-open', os.path.dirname(path)])
     def returnToHome(self):
         if self.landing_page:
             self.landing_page.show()
@@ -1194,27 +1239,27 @@ class ImageGalleryApp(QMainWindow):
             return pixmap
     
 
-    def add_to_scene(self, x, y, image, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
+    def add_to_scene(self, x, y, image, path, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
         pixmap = None
+        # path = None
+        
         if isinstance(image, QPixmap):
             pixmap = image
         else:
             pixmap = self.imageToQPixmap(image)
         
         item = QGraphicsPixmapItem(pixmap)
-
-        # center image on position
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
         
-        base_speed = 1000  # degrees per frame
-
-        # direction: (1 = clockwise, -1 = counterclockwise)
-        w = base_speed * direction / (r + 1) # angular velocity
-        
-        self.image_data[item] = {'r': r,
-                             'th_0': initial_angle,
-                             'w': w,}
+        base_speed = 1000
+        w = base_speed * direction / (r + 1)
+        self.image_data[item] = {
+            'r': r,
+            'th_0': initial_angle,
+            'w': w,
+            'path': path
+        }
 
     def update_animation(self):
         self.animation_time += (int(1000/self.FPS) / 1000) # 60 FPS
@@ -1239,6 +1284,10 @@ class ImageGalleryApp(QMainWindow):
     
 
     def circles(self, images):
+        paths = []
+        for image in images:
+            paths.append(image.get("path"))
+
         if self.loadonce:
             images = self.imageToQPixmap(images)
 
@@ -1255,8 +1304,7 @@ class ImageGalleryApp(QMainWindow):
 
             x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
             y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
-
-            self.add_to_scene(x=x, y=y, image=image, h=th, r=r, initial_angle=th, 
+            self.add_to_scene(x=x, y=y, image=image, path=paths[i], h=th, r=r, initial_angle=th, 
                         direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
             QApplication.processEvents()
             
@@ -1309,6 +1357,10 @@ class ImageGalleryApp(QMainWindow):
 
     # makes circular rings, but tries to order images in rings by hue
     def circlesh(self, images):
+        paths = []
+        for image in images:
+            paths.append(image.get("path"))
+
         hueinfo = []
 
         if self.loadonce:
@@ -1326,18 +1378,20 @@ class ImageGalleryApp(QMainWindow):
         n = 1
         total = 0
 
+        imgct = 0
+
         # ths is the thetas (angles) for each image in a ring
         # defined better at end of loop body
         ths = np.array([0])
-        
+
         # every iteration of this loop is a new ring
         # this structure is because n is random and different for each ring
         while len(hueinfo) > 0:
             # list of images in the current ring
             imgs = []
             for i in range(n):
-                total += 1
                 if len(hueinfo) > 0:
+                    total += 1
                     imgs.append(hueinfo.pop(0))
 
             # # sort by hue
@@ -1361,8 +1415,9 @@ class ImageGalleryApp(QMainWindow):
                 x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
                 y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
 
-                self.add_to_scene(x=x, y=y, image=image["pixmap"], h=th, r=r, initial_angle=th, 
+                self.add_to_scene(x=x, y=y, image=image["pixmap"], path=paths[imgct], h=th, r=r, initial_angle=th, 
                             direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
+                imgct += 1
             QApplication.processEvents()
 
             # go to next ring
@@ -1380,11 +1435,18 @@ class ImageGalleryApp(QMainWindow):
 
 
     def hexagons(self, images):
+        paths = []
+        for image in images:
+            paths.append(image.get("path"))
+
+
         if self.loadonce:
             images = self.imageToQPixmap(images)
 
         # center image @ (0, 0)
-        self.add_to_scene(x= 0, y= 0, image= images[0])
+        self.add_to_scene(x= 0, y= 0, image= images[0], path=paths[0])
+
+        img = 1 # image count
 
         # level aka ring
         # calculate how many levels there are based on num images
@@ -1449,8 +1511,8 @@ class ImageGalleryApp(QMainWindow):
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
 
-                self.add_to_scene(x=x, y=y, image=image, h=th, 
-                           r=radius, initial_angle=th, direction= 1)
+                self.add_to_scene(x=x, y=y, image=image, path= paths[img], h=th, r=radius, initial_angle=th, direction= 1)
+                img += 1
                 
                 QApplication.processEvents()
 
