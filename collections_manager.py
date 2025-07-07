@@ -1,11 +1,12 @@
-# TODO fix progress bars
+# TODO
 # fix double populating when generating galleries more than once when images are scaling
-# save qpixmpas to memory to be reused
 # show palettes
-# progress bar for color making
+# progress bar for color making or save palettes
 # add collection_id so renaming doesn't change files or folders for indexes
 # check y its taking so long to open imagaes
-# fix color picker
+# choose between colorpickers
+# zoom not centered
+# deleting and updating collections and problem of duplicate collections
 
 import sys
 import os
@@ -13,15 +14,15 @@ import json
 from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
-                             QFrame, QScrollArea, QDialog, QLineEdit, 
+                             QFrame, QScrollArea, QDialog, QLineEdit, QProgressDialog,
                              QFileDialog, QCheckBox, QMessageBox, QComboBox, QMenu, QInputDialog, QMessageBox)
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
-from PyQt5.QtCore import Qt, QSize, pyqtSignal
+from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 
 print(0)
 
 # Import the gallery app
-from gallery import ImageGalleryApp  # Assuming your gallery code is in paste.py
+# from gallery import ImageGalleryApp
 
 
 class CollectionThumbnail(QFrame):
@@ -688,8 +689,8 @@ class CollectionsLandingPage(QMainWindow):
         """Create color index for a collection"""
         from accessDBs import add_color
         import threading
-        from PyQt5.QtWidgets import QProgressDialog
-        from PyQt5.QtCore import QThread, pyqtSignal
+        # from PyQt5.QtWidgets import QProgressDialog
+        # from PyQt5.QtCore import QThread, pyqtSignal
         
         class IndexWorker(QThread):
             progress = pyqtSignal(int)
@@ -762,13 +763,74 @@ def main():
     
     # Set application style
     app.setStyle('Fusion')
-    
+
     window = CollectionsLandingPage()
     window.show()
+
+    class ImportThread(QThread):
+        finished = pyqtSignal(object)
+        error = pyqtSignal(str)
+
+        def run(self):
+            try:
+                # Import in thread
+                global ImageGalleryApp
+                from gallery import ImageGalleryApp
+                
+                self.finished.emit(ImageGalleryApp)
+            except Exception as e:
+                self.error.emit(str(e))
+
+
+    progress = QProgressDialog("Loading models...", None, 0, 0, parent=window)
+    progress.setWindowTitle("Loading")
+    progress.setWindowModality(Qt.WindowModal)
+    progress.setCancelButton(None)  # Remove cancel button
+    progress.setMinimumDuration(0)  # Show immediately
+    progress.setFont(QFont(window.font, 11))
+    progress.setWindowFlag(Qt.WindowCloseButtonHint, False)
+    progress.setStyleSheet("""
+        QProgressDialog {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        QProgressBar {
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            text-align: center;
+        }
+    """)
     
+    progress.show()
+    # app.processEvents()
+
+    # Create and start import thread
+    import_thread = ImportThread()
+
+
+    def on_import_finished(ImageGalleryApp):
+        progress.setLabelText("Done. Welcome to Image Gallery!")
+        QTimer.singleShot(750, progress.close)
+        # progress.close()
+        # globals()['ImageGalleryApp'] = ImageGalleryApp
+
+    def on_import_error(error_msg):
+        progress.close()
+        QMessageBox.critical(window, "Error", f"Failed to load models: {error_msg}")
+        sys.exit(1)
+
+    import_thread.finished.connect(on_import_finished)
+    import_thread.error.connect(on_import_error)
+    import_thread.start()
+    # global ImageGalleryApp
+    # from gallery import ImageGalleryApp
+    # progress.close()
     sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
+    
     main()
     print("done")

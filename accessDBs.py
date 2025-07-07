@@ -1,7 +1,7 @@
 from PIL import Image
-import chromadb
-from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
-from chromadb.utils.data_loaders import ImageLoader
+# import chromadb
+# from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
+# from chromadb.utils.data_loaders import ImageLoader
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -54,7 +54,7 @@ def get_files(folder_path, explore = False):
     return image_paths
 
 
-def add_visual(name, folder_path, explore=False, batch_size=64, model="dino"):
+def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", progress=None):
     image_paths = get_files(folder_path, explore)
     all_embeddings = []
     current_batch_images = []
@@ -84,6 +84,8 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino"):
 
             all_embeddings.append(embeddings_batch.cpu())
             current_batch_images = []
+        if progress:
+            progress.setValue(i + 1)
 
     vectors = torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 

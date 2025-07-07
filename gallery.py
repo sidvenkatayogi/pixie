@@ -121,6 +121,7 @@ class ImageGalleryApp(QMainWindow):
         self.view = CustomGraphicsView(self.scene)
         self.loadonce = False
         self.image_data = {}
+        self.pixmaps = {}
         self.STD_SIZE = 512
         self.STD_SPACE = self.STD_SIZE * 1.25
         
@@ -830,29 +831,32 @@ class ImageGalleryApp(QMainWindow):
         from accessDBs import add_visual
         from PyQt5.QtCore import QThread, pyqtSignal
         
+
         class IndexCreationWorker(QThread):
             progress = pyqtSignal(str)
             finished = pyqtSignal()
             error = pyqtSignal(str)
             
-            def __init__(self, name, folder, explore, index_type):
+            def __init__(self, name, folder, explore, index_type, progress_dialog):
                 super().__init__()
                 self.name = name
                 self.folder = folder 
                 self.explore = explore
                 self.index_type = index_type
-                
+                self.progress_dialog = progress_dialog
+
             def run(self):
                 try:
                     self.progress.emit(f"Creating {self.index_type.upper()} index...")
-                    add_visual(self.name, self.folder, self.explore, model=self.index_type)
+                    add_visual(self.name, self.folder, self.explore, model=self.index_type, progress= self.progress_dialog)
                     self.finished.emit()
                 except Exception as e:
                     self.error.emit(str(e))
         
         # Show progress dialog
-        progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", "Cancel", 0, 0, self)
+        progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", None, 0, self.collection_data["image_count"], self)
         progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setWindowFlag(Qt.WindowCloseButtonHint, False)
         progress_dialog.show()
         
         # Start worker
@@ -860,7 +864,8 @@ class ImageGalleryApp(QMainWindow):
             self.collection_data['name'],
             self.collection_data['folder'], 
             self.collection_data['subfolders'],
-            index_type
+            index_type,
+            progress_dialog
         )
         
         def on_finished():
@@ -1005,15 +1010,15 @@ class ImageGalleryApp(QMainWindow):
 
         try:
             image_size = int(image_size)
-            # if 64 <= size <= 2048:  # Reasonable size limits
+            # if 32 <= size <= 2048:  # Reasonable size limits
                 
                 # # Clear gallery if any images are displayed
                 # if len(self.image_data) > 0:
                 #     self.clearGallery()
             if image_size > 2048:
                 self.STD_SIZE = 2048
-            elif image_size < 64:
-                self.STD_SIZE = 64
+            elif image_size < 32:
+                self.STD_SIZE = 32
             else:
                 self.STD_SIZE = image_size
 
@@ -1207,13 +1212,42 @@ class ImageGalleryApp(QMainWindow):
 
     def imageToQPixmap(self, image_info):
         if isinstance(image_info, list):
+            # start = time.time()
+            # Create progress dialog
+            progress = QProgressDialog("Rendering images...", None, 0, len(image_info), self)
+            progress.setWindowTitle("Loading")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setCancelButton(None)
+            progress.setWindowFlag(Qt.WindowCloseButtonHint, False)
+            progress.setFont(QFont(self.font, 11))
+            progress.setStyleSheet("""
+                QProgressDialog {
+                    background-color: white;
+                    min-width: 300px;
+                    min-height: 50px;
+                }
+                QProgressBar {
+                    text-align: center;
+                    border: 1px solid #ccc;
+                    border-radius: 2px;
+                    margin: 10px;
+                }
+            """)
+            
+            progress.show()
+
             pixmaps = []
-            for image in tqdm(image_info, desc= "Scaling..."):
+            # for image in tqdm(image_info, desc= "Scaling..."):
+            for i, image in enumerate(image_info):
                 pixmaps.append(self.imageToQPixmap(image))
+                progress.setValue(i + 1)
+                QApplication.processEvents()
+            # end = time.time()
+            # print(f"{end-start} seconds")
             return pixmaps
         else:
             image = image_info
-            pixmap = image.get("pixmap")
 
             if "image" in image:
                 image = image["image"]
@@ -1235,9 +1269,12 @@ class ImageGalleryApp(QMainWindow):
 
                 pixmap = QPixmap.fromImage(qimage)
             else:
+                pixmap = image.get("pixmap")
                 if isinstance(image.get("path"), str):
-                    pixmap = QPixmap(image["path"])
-
+                    pixmap = self.pixmaps.get(image.get("path"))
+                    if not pixmap:
+                        pixmap = QPixmap(image["path"])
+                        # self.pixmaps[image.get("path")] = pixmap
                 h = pixmap.height()
                 w = pixmap.width()
 
@@ -1265,6 +1302,7 @@ class ImageGalleryApp(QMainWindow):
         else:
             pixmap = self.imageToQPixmap(image)
         
+
         item = QGraphicsPixmapItem(pixmap)
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
