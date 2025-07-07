@@ -127,7 +127,7 @@ class ImageGalleryApp(QMainWindow):
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
-        self.FPS = 48
+        self.FPS = 60
         self.animation_time = 0.0
 
         self.zoom_animation_timer = QTimer()
@@ -1150,6 +1150,7 @@ class ImageGalleryApp(QMainWindow):
         sw = self.zoom_target_rect.width() * start_scale
         sh = self.zoom_target_rect.height() * start_scale
         start_rect = QRectF(-sw/2,-sh/2,sw,sh)
+        start_rect = QRectF(-self.STD_SPACE/2, -self.STD_SPACE/2, self.STD_SPACE, self.STD_SPACE)
         
         self.view.fitInView(start_rect, Qt.KeepAspectRatio)
         
@@ -1271,7 +1272,7 @@ class ImageGalleryApp(QMainWindow):
             else:
                 pixmap = image.get("pixmap")
                 if isinstance(image.get("path"), str):
-                    pixmap = self.pixmaps.get(image.get("path"))
+                    # pixmap = self.pixmaps.get(image.get("path"))
                     if not pixmap:
                         pixmap = QPixmap(image["path"])
                         # self.pixmaps[image.get("path")] = pixmap
