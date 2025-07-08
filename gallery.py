@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
                              QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, 
                              QHBoxLayout, QWidget, QPushButton, QSlider, QLabel,
                              QLineEdit, QComboBox, QFileDialog, QFrame, QColorDialog,
-                             QButtonGroup, QRadioButton, QGroupBox, QSpacerItem,
+                             QButtonGroup, QRadioButton, QGroupBox, QSpacerItem, QDialog,
                              QSizePolicy, QProgressDialog, QMessageBox, QCheckBox, QMenu)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize, QThread
@@ -16,7 +16,7 @@ import json
 # from search_color import search
 # from add_color import add
 from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
-from colors import get_dominant_colors
+from colors import get_dominant_colors, show_palette
 
 import PIL
 from PIL import Image
@@ -155,10 +155,35 @@ class ImageGalleryApp(QMainWindow):
             # for data_item, data in self.image_data.items():
             #     if data_item == item:
                     path = self.image_data[item]["path"]
+                    preview = None
+                    print(self.image_data[item])
+                    if isinstance(self.image_data[item].get("colors"), (list, np.ndarray)):
+                        colors = self.image_data[item]["colors"]
+                        image = show_palette(colors)
+                        
+                        # Create color palette preview dialog
+                        preview = QDialog(self)
+                        preview.setWindowTitle("Color Palette")
+                        preview.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+                        preview_layout = QVBoxLayout(preview)
+                        
+                        # Convert PIL image to QPixmap
+                        if image.mode != 'RGB':
+                            image = image.convert('RGB')
+
+                        data = image.tobytes("raw", "RGB")
+                        qimage = QImage(data, image.size[0], image.size[1], image.size[0] * 3, QImage.Format_RGB888)
+
+                        palette_pixmap = QPixmap.fromImage(qimage)
+                        palette_label = QLabel()
+                        palette_label.setPixmap(palette_pixmap)
+                        preview_layout.addWidget(palette_label)
+                        
                     # Create context menu
                     menu = QMenu()
                     open_file = menu.addAction("Open Image")
                     open_location = menu.addAction("Show in Folder")
+                    open_palette = menu.addAction("Show Color Palette")
                     
                     # Show menu and get selected action
                     action = menu.exec_(event.screenPos())
@@ -167,6 +192,8 @@ class ImageGalleryApp(QMainWindow):
                         self.openImage(path)
                     elif action == open_location:
                         self.showInFolder(path)
+                    elif action == open_palette:
+                        preview.exec_()
 
     def openImage(self, path):
         """Open image with default system viewer"""
@@ -368,6 +395,7 @@ class ImageGalleryApp(QMainWindow):
 
         self.loadonce_checkbox = QCheckBox("Load all images at once")
         self.loadonce_checkbox.setFont(QFont(self.font, 11))
+        self.loadonce_checkbox.setChecked(True)
         self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
         layout.addWidget(self.loadonce_checkbox)
         
@@ -1294,7 +1322,7 @@ class ImageGalleryApp(QMainWindow):
             return pixmap
     
 
-    def add_to_scene(self, x, y, image, path, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
+    def add_to_scene(self, x, y, image, path, colors= None, h=10, s=255, l=128, r=0, initial_angle=0, direction=0):
         pixmap = None
         # path = None
         
@@ -1314,7 +1342,8 @@ class ImageGalleryApp(QMainWindow):
             'r': r,
             'th_0': initial_angle,
             'w': w,
-            'path': path
+            'path': path,
+            'colors': colors
         }
 
     def update_animation(self):
@@ -1341,8 +1370,10 @@ class ImageGalleryApp(QMainWindow):
 
     def circles(self, images):
         paths = []
+        colors = []
         for image in images:
             paths.append(image.get("path"))
+            colors.append(image.get("colors"))
 
         if self.loadonce:
             images = self.imageToQPixmap(images)
@@ -1360,7 +1391,7 @@ class ImageGalleryApp(QMainWindow):
 
             x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
             y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
-            self.add_to_scene(x=x, y=y, image=image, path=paths[i], h=th, r=r, initial_angle=th, 
+            self.add_to_scene(x=x, y=y, image=image, path=paths[i], colors= colors[i], h=th, r=r, initial_angle=th, 
                         direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
             QApplication.processEvents()
             
@@ -1409,13 +1440,15 @@ class ImageGalleryApp(QMainWindow):
 
             avg_hue = np.arctan2(tx/tf, ty/tf) / (2 * np.pi)
 
-            return {"pixmap": image, "hue": avg_hue}
+            return {"pixmap": image, "hue": avg_hue, "colors": l}
 
     # makes circular rings, but tries to order images in rings by hue
     def circlesh(self, images):
         paths = []
+        colors = []
         for image in images:
             paths.append(image.get("path"))
+            colors.append(image.get("colors"))
 
         hueinfo = []
 
@@ -1471,7 +1504,7 @@ class ImageGalleryApp(QMainWindow):
                 x = r * np.cos(th / 360 * 2 * np.pi) * self.STD_SPACE
                 y = -r * np.sin(th / 360 * 2 * np.pi) * self.STD_SPACE
 
-                self.add_to_scene(x=x, y=y, image=image["pixmap"], path=paths[imgct], h=th, r=r, initial_angle=th, 
+                self.add_to_scene(x=x, y=y, image=image["pixmap"], path=paths[imgct], colors= image.get("colors"), h=th, r=r, initial_angle=th, 
                             direction= (int(r) % 2) * 2 - 1) # alternate rotation every ring
                 imgct += 1
             QApplication.processEvents()
@@ -1492,17 +1525,18 @@ class ImageGalleryApp(QMainWindow):
 
     def hexagons(self, images):
         paths = []
+        colors = []
         for image in images:
             paths.append(image.get("path"))
-
+            colors.append(image.get("colors"))
 
         if self.loadonce:
             images = self.imageToQPixmap(images)
 
         # center image @ (0, 0)
-        self.add_to_scene(x= 0, y= 0, image= images[0], path=paths[0])
+        self.add_to_scene(x= 0, y= 0, color= colors[0], image= images[0], path=paths[0])
 
-        img = 1 # image count
+        imgct = 1 # image count
 
         # level aka ring
         # calculate how many levels there are based on num images
@@ -1567,8 +1601,8 @@ class ImageGalleryApp(QMainWindow):
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
 
-                self.add_to_scene(x=x, y=y, image=image, path= paths[img], h=th, r=radius, initial_angle=th, direction= 1)
-                img += 1
+                self.add_to_scene(x=x, y=y, image=image, path= paths[imgct], color= colors[imgct], h=th, r=radius, initial_angle=th, direction= 1)
+                imgct += 1
                 
                 QApplication.processEvents()
 

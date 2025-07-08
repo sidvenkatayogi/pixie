@@ -118,21 +118,23 @@ def create_bar(height, width, color):
     return bar, (red, green, blue)
 
 
-def show(path):
-    img = Image.open(path)
+# def show(path):
+def show_palette(cols):
+    # img = Image.open(path)
     bars = []
-    cols = get_dominant_colors(img, num_colors= 5)
+    # cols = get_dominant_colors(img, num_colors= 5)
     for color in cols.reshape(int(len(cols)/4), 4):
         bar, rgb = create_bar(200, 200, color)
         bars.append(bar)
 
     img_bar = np.hstack(bars)
-    img.show(title=os.path.basename(path))
-    Image.fromarray(img_bar).show(title='Dominant colors')
+    # img.show(title=os.path.basename(path))
+    # Image.fromarray(img_bar).show(title='Dominant colors')
+    return Image.fromarray(img_bar)
 
 
 if __name__ == "__main__":
     dir = r"gallery-dl\pinterest\sidvenkatayogii\Reference"
     for p in os.listdir(dir):
-        show(os.path.join(dir, p))
+        show_palette(os.path.join(dir, p))
         input("ENTER for next image")
