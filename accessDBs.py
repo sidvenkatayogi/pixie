@@ -164,10 +164,12 @@ def search_visual(name, file_path, k = -1):
         
     results = []
     for i in range(len(indices)):
-        results.append({"path": image_paths[i], "distance": distances[i]})
+        if indices[i] < len(image_paths):
+            results.append({"path": image_paths[indices[i]], "distance": distances[i]})
 
     results.sort(key= lambda x: x["distance"])
-    return results
+
+    return [{"path": file_path, "distance": 0}] + results
 
 
 def search_clip(name, query : str, k = -1):
@@ -206,6 +208,7 @@ def search_clip(name, query : str, k = -1):
             results.append({"path": image_paths[indices[i]], "distance": distances[i]})
 
     results.sort(key=lambda x: x["distance"])
+    
     return results
 
 

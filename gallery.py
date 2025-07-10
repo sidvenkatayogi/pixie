@@ -111,7 +111,7 @@ class ImageGalleryApp(QMainWindow):
         self.font = font
         self.landing_page = None
         self.collection_data = collection_data
-        self.current_search_mode = "browse"  # browse, color, clip, dino
+        # self.current_search_mode = "browse"  # browse, color, clip, dino
         self.setWindowTitle("Image Gallery")
         self.setGeometry(100, 100, 1400, 768)
 
@@ -138,7 +138,6 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_animating = False
 
         self.selected_color = QColor(0, 0, 0)  # Default white
-        self.selected_image_path = ""
 
         self.scene.contextMenuEvent = self.sceneContextMenuEvent
 
@@ -375,7 +374,6 @@ class ImageGalleryApp(QMainWindow):
         self.loadonce_checkbox = QCheckBox("Load all images at once")
         self.loadonce_checkbox.setFont(QFont(self.font, 11))
         self.loadonce_checkbox.setChecked(True)
-        self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
         layout.addWidget(self.loadonce_checkbox)
 
         self.search_frame = QFrame()
@@ -508,12 +506,18 @@ class ImageGalleryApp(QMainWindow):
             pass  # Invalid input, ignore
 
     def selectColor(self):
+        # default Qt color picker
         # color = QColorDialog.getColor(self.selected_color, self, "Select Color")
+
+        # i like this color picker the best
+        # https://orthallelous.wordpress.com/2018/12/19/custom-color-dialog/
         color = colorPicker.getColor(self.selected_color, self, "Select Color")
+
         if color.isValid():
             self.selected_color = color
             self.color_button.setStyleSheet(f"background-color: {color.name()}; border: 2px solid #666;")
 
+        # this is a more modern custom color picker
         # vcolorpicker.useLightTheme(True)
         # current_rgb = (self.selected_color.red(), 
         #           self.selected_color.green(), 
@@ -526,33 +530,8 @@ class ImageGalleryApp(QMainWindow):
         #     self.color_button.setStyleSheet(
         #         f"background-color: {self.selected_color.name()}; border: 2px solid #666;"
         #     )
-        
-    def selectImage(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select Reference Image", 
-            "", 
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
-        )
-        if file_path:
-            self.selected_image_path = file_path
-            # Show just the filename for brevity
-            filename = os.path.basename(file_path)
-            self.image_path_label.setText(f"Selected: {filename}")
-
-    def selectColorImage(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select Reference Image for Color Search", 
-            "", 
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
-        )
-        if file_path:
-            self.selected_color_image_path = file_path
-            filename = os.path.basename(file_path)
-            self.color_image_path_label.setText(f"Selected: {filename}")
     
-    def selectQueryImage(self):
+    def queryImageDialog(self):
         """Select query image for similarity search"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Query Image", "", 
@@ -560,9 +539,18 @@ class ImageGalleryApp(QMainWindow):
         )
         if file_path:
             self.query_image_path = file_path
-            # Show selected image path
-            if hasattr(self, 'query_image_label'):
-                self.query_image_label.setText(f"Selected: {os.path.basename(file_path)}")
+
+    def selectImage(self):
+        self.queryImageDialog()
+        file_path = self.query_image_path
+        filename = os.path.basename(file_path)
+        self.image_path_label.setText(f"Selected: {filename}")
+
+    def selectColorImage(self):
+        self.queryImageDialog()
+        file_path = self.query_image_path
+        filename = os.path.basename(file_path)
+        self.color_image_path_label.setText(f"Selected: {filename}")
 
     def setupColorSearchControls(self):
         self.clearSearchControls()
@@ -709,73 +697,6 @@ class ImageGalleryApp(QMainWindow):
         else:
             add_visual(name=name, folder_path=directory, explore=explore, model= by)
 
-    def onSearchModeChanged(self, mode):
-        """Handle search mode change"""
-        self.current_search_mode = mode.lower().replace(" search", "")
-        self.setupSearchInput()
-
-    def onLoadModeChanged(self, checked):
-        """Handle load mode change"""
-        self.loadonce = checked
-
-    def setupSearchInput(self):
-        """Setup search input based on current mode"""
-        # Clear existing input widgets
-        for i in reversed(range(self.search_input_layout.count())):
-            self.search_input_layout.itemAt(i).widget().setParent(None)
-        
-        if self.current_search_mode == "browse":
-            return
-        
-        if self.current_search_mode == "color":
-            # Color search input
-            self.search_input_layout.addWidget(QLabel("Search by:"))
-            
-            color_mode_combo = QComboBox()
-            color_mode_combo.addItems(["RGB Color", "Query Image"])
-            self.search_input_layout.addWidget(color_mode_combo)
-            
-            # RGB input
-            self.rgb_input = QLineEdit()
-            self.rgb_input.setPlaceholderText("R,G,B (e.g., 255,0,0)")
-            self.search_input_layout.addWidget(self.rgb_input)
-            
-            # Image selection
-            image_select_btn = QPushButton("Select Query Image")
-            image_select_btn.clicked.connect(self.selectQueryImage)
-            self.search_input_layout.addWidget(image_select_btn)
-            
-        elif self.current_search_mode == "clip":
-            # CLIP search input
-            self.search_input_layout.addWidget(QLabel("Search by:"))
-            
-            clip_mode_combo = QComboBox()
-            clip_mode_combo.addItems(["Text Query", "Query Image"])
-            self.search_input_layout.addWidget(clip_mode_combo)
-            
-            # Text input
-            self.text_input = QLineEdit()
-            self.text_input.setPlaceholderText("Enter text description...")
-            self.search_input_layout.addWidget(self.text_input)
-            
-            # Image selection
-            image_select_btn = QPushButton("Select Query Image") 
-            image_select_btn.clicked.connect(self.selectQueryImage)
-            self.search_input_layout.addWidget(image_select_btn)
-            
-        elif self.current_search_mode == "dino":
-            # DINO search input
-            self.search_input_layout.addWidget(QLabel("Query Image:"))
-            image_select_btn = QPushButton("Select Query Image")
-            image_select_btn.clicked.connect(self.selectQueryImage)
-            self.search_input_layout.addWidget(image_select_btn)
-        
-        # Search button
-        print("sjfhafihfua")
-        search_btn = QPushButton("Search")
-        search_btn.clicked.connect(self.performSearch)
-        self.search_input_layout.addWidget(search_btn)
-
     def createIndex(self, index_type):
         """Create similarity search index"""
         if not self.collection_data:
@@ -887,69 +808,6 @@ class ImageGalleryApp(QMainWindow):
         if index >= 0:
             self.search_type_combo.setCurrentIndex(index)
 
-
-    def performSearch(self):
-        """Perform similarity search based on current mode"""
-        if not self.collection_data or self.current_search_mode == "browse":
-            return
-            
-        # from accessDBs import search_color, search_clip, search_visual
-        
-        try:
-            results = []
-            name = self.collection_data['name']
-            
-            if self.current_search_mode == "color":
-                if hasattr(self, 'query_image_path'):
-                    results = search_color(name, path=self.query_image_path)
-                elif hasattr(self, 'rgb_input') and self.rgb_input.text():
-                    rgb_text = self.rgb_input.text().strip()
-                    rgb = tuple(map(int, rgb_text.split(',')))
-                    results = search_color(name, rgb=rgb)
-                    
-            elif self.current_search_mode == "clip":
-                if hasattr(self, 'text_input') and self.text_input.text():
-                    results = search_clip(name, self.text_input.text())
-                elif hasattr(self, 'query_image_path'):
-                    # you can use clip with an image, but i'll just leave it for the dino
-                    pass
-                    
-            elif self.current_search_mode == "dino":
-                if hasattr(self, 'query_image_path'):
-                    results = search_visual(name, self.query_image_path)
-            
-            # Display results
-            self.displaySearchResults(results)
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Search Error", f"Search failed: {str(e)}")
-
-    def displaySearchResults(self, results):
-        """Display search results in the grid"""
-        # Clear current grid
-        self.clearImageGrid()
-        
-        # Load results based on loadonce setting
-        if self.loadonce:
-            # Load all at once
-            for result in results:
-                self.addImageToGrid(result['path'])
-        else:
-            # Load sequentially with delay
-            self.search_results = results
-            self.current_result_index = 0
-            self.loadNextSearchResult()
-
-    def loadNextSearchResult(self):
-        """Load next search result sequentially"""
-        if hasattr(self, 'search_results') and self.current_result_index < len(self.search_results):
-            result = self.search_results[self.current_result_index]
-            self.addImageToGrid(result['path'])
-            self.current_result_index += 1
-            
-            # # Schedule next load
-            # QTimer.singleShot(100, self.loadNextSearchResult)
-
     def generateGallery(self):
         # Clear existing gallery first
         self.clearGallery()
@@ -960,14 +818,11 @@ class ImageGalleryApp(QMainWindow):
         search_type = self.search_type_combo.currentText()
         layout_type = self.layout_buttons.checkedId()
         image_size = self.size_input.text()
+        self.loadonce = self.loadonce_checkbox.isChecked()
 
         try:
             image_size = int(image_size)
-            # if 32 <= size <= 2048:  # Reasonable size limits
-                
-                # # Clear gallery if any images are displayed
-                # if len(self.image_data) > 0:
-                #     self.clearGallery()
+            # Reasonable size limits
             if image_size > 2048:
                 self.STD_SIZE = 2048
             elif image_size < 32:
@@ -986,68 +841,63 @@ class ImageGalleryApp(QMainWindow):
             
             if search_type == "Color Search":
                 # Check which mode is being used
-                if hasattr(self, 'color_search_mode'):
-                    mode = self.color_search_mode.currentText()
-                    
-                    if mode == "Reference Image":
-                        # Use image path for color search
-                        if hasattr(self, 'selected_color_image_path') and self.selected_color_image_path:
-                            images = search_color(database, path=self.selected_color_image_path, k=num_images)
-                        else:
-                            QMessageBox.warning(self, "Warning", "Please select a reference image for color search")
+                mode = self.color_search_mode.currentText()
+                
+                if mode == "Reference Image":
+                    # Use image path for color search
+                    if hasattr(self, 'query_image_path') and self.query_image_path:
+                        images = search_color(database, path=self.query_image_path, k=num_images)
+                    else:
+                        QMessageBox.warning(self, "Warning", "Please select a reference image for color search")
+                        return
+                else:  # RGB Color Picker mode
+                    # Use RGB values from color picker or manual input
+                    if hasattr(self, 'rgb_input') and self.rgb_input.text().strip():
+                        # Use manual RGB input if available
+                        try:
+                            rgb_text = self.rgb_input.text().strip()
+                            rgb_values = tuple(int(x.strip()) for x in rgb_text.split(','))
+                            if len(rgb_values) == 3:
+                                images = search_color(database, rgb=rgb_values, k=num_images)
+                            else:
+                                raise ValueError("Invalid RGB format")
+                        except ValueError:
+                            QMessageBox.warning(self, "Warning", "Please enter valid RGB values (e.g., 255,128,0)")
                             return
-                    else:  # RGB Color Picker mode
-                        # Use RGB values from color picker or manual input
-                        if hasattr(self, 'rgb_input') and self.rgb_input.text().strip():
-                            # Use manual RGB input if available
-                            try:
-                                rgb_text = self.rgb_input.text().strip()
-                                rgb_values = tuple(int(x.strip()) for x in rgb_text.split(','))
-                                if len(rgb_values) == 3:
-                                    images = search_color(database, rgb=rgb_values, k=num_images)
-                                else:
-                                    raise ValueError("Invalid RGB format")
-                            except ValueError:
-                                QMessageBox.warning(self, "Warning", "Please enter valid RGB values (e.g., 255,128,0)")
-                                return
-                        else:
-                            # Use color picker
-                            rgb_values = (self.selected_color.red(), self.selected_color.green(), self.selected_color.blue())
-                            images = search_color(database, rgb=rgb_values, k=num_images)
-                else:
-                    # Fallback to old behavior
-                    rgb_values = (self.selected_color.red(), self.selected_color.green(), self.selected_color.blue())
-                    images = search_color(database, rgb=rgb_values, k=num_images)
+                    else:
+                        # Use color picker
+                        rgb_values = (self.selected_color.red(), self.selected_color.green(), self.selected_color.blue())
+                        images = search_color(database, rgb=rgb_values, k=num_images)
                     
             elif search_type == "Text Search (CLIP)":
                 if hasattr(self, 'text_input') and self.text_input.text().strip():
                     query = self.text_input.text().strip()
                     images = search_clip(name=database, query=query, k=num_images)
                 else:
-                    print("No text query entered")
+                    QMessageBox.warning(self, "Warning", "Please enter a text query")
                     return
                     
             elif search_type == "Image Similarity Search (DINO)":
-                if hasattr(self, 'selected_image_path') and self.selected_image_path:
-                    images = search_visual(name=database, file_path=self.selected_image_path, k=num_images)
+                if hasattr(self, 'query_image_path') and self.query_image_path:
+                    images = search_visual(name=database, file_path=self.query_image_path, k=num_images)
+                    print(images)
                 else:
                     print("No reference image selected for visual similarity")
                     return
-                    
-            elif search_type == "Image Content Search (CLIP)":
-                if hasattr(self, 'selected_image_path') and self.selected_image_path:
-                    images = search_clip(database, query_image_path=self.selected_image_path, k=num_images)
-                else:
-                    print("No reference image selected for image search")
-                    return
+            
+            # just gonna let dino do image search
+            # elif search_type == "Image Content Search (CLIP)":
+            #     if hasattr(self, 'query_image_path') and self.query_image_path:
+            #         images = search_clip(database, query_image_path=self.query_image_path, k=num_images)
+            #     else:
+            #         print("No reference image selected for image search")
+            #         return
             
             if len(images) == 0:
-                print("No images found")
+                QMessageBox.warning(self, "Error", "No images found! Check if the collection folder contains images")
                 return
             
             # Apply layout based on selection
-            # self.loadonce = False
-            
             if layout_type == 0:  # Circles
                 self.circles(images)
             elif layout_type == 1:  # Circles by Hue
@@ -1057,7 +907,9 @@ class ImageGalleryApp(QMainWindow):
                 
         except Exception as e:
             print(f"Error generating gallery: {e}")
+            QMessageBox.warning(self, "Error", f"{e}")
     
+    # zoom stuff
     def calculate_bounds(self):
         
         min_x = min_y = max_x = max_y = 0
@@ -1095,22 +947,22 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_duration = duration_ms
         self.zoom_start_scale = start_scale
         self.zoom_elapsed = 0
-        # self.zoom_animating = self.loadonce
         self.zoom_animating = True
-        sw = self.zoom_target_rect.width() * start_scale
-        sh = self.zoom_target_rect.height() * start_scale
-        start_rect = QRectF(-sw/2,-sh/2,sw,sh)
+        # sw = self.zoom_target_rect.width() * start_scale
+        # sh = self.zoom_target_rect.height() * start_scale
+        # start_rect = QRectF(-sw/2,-sh/2,sw,sh)
+
         start_rect = QRectF(-self.STD_SPACE/2, -self.STD_SPACE/2, self.STD_SPACE, self.STD_SPACE)
         
         self.view.fitInView(start_rect, Qt.KeepAspectRatio)
         
-        self.zoom_animation_timer.start(int(1000/(self.FPS * 2)))
+        self.zoom_animation_timer.start(int(1000/(self.FPS)))
 
     def update_zoom(self):
         if not self.zoom_animating:
             return
         
-        self.zoom_elapsed += int(1000/(self.FPS * 2))
+        self.zoom_elapsed += int(1000/(self.FPS))
         
         if self.zoom_elapsed >= self.zoom_duration:
             self.view.fitInView(self.zoom_target_rect, Qt.KeepAspectRatio)
@@ -1147,7 +999,28 @@ class ImageGalleryApp(QMainWindow):
 
     def ease_out_exp(self, t):
         return 1 - np.exp(-5 * t) if t != 1 else 1 # for floating point
-    
+
+    # rotation
+    def update_animation(self):
+        self.animation_time += (int(1000/self.FPS) / 1000) # 60 FPS
+        
+        for item, data in self.image_data.items():
+            # item = data['item']
+            r = data['r']
+            th_0 = data['th_0']
+            w = data['w']
+            if w != 0:
+                # th = th_0 + w * self.animation_time # rotation with constant w
+                th = th_0 + w # reverse to initial position
+                
+                th = th * (2 * np.pi / 360)
+                new_x = r * np.cos(th) * self.STD_SPACE
+                new_y = r * np.sin(th) * self.STD_SPACE
+                
+                # center image on position
+                pixmap = item.pixmap()
+                item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
+            self.image_data[item]['w'] *= 0.96 # reverse to initial position
 
     def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)
@@ -1268,26 +1141,6 @@ class ImageGalleryApp(QMainWindow):
             'colors': colors
         }
 
-    def update_animation(self):
-        self.animation_time += (int(1000/self.FPS) / 1000) # 60 FPS
-        
-        for item, data in self.image_data.items():
-            # item = data['item']
-            r = data['r']
-            th_0 = data['th_0']
-            w = data['w']
-            if w != 0:
-                # th = th_0 + w * self.animation_time # rotation with constant w
-                th = th_0 + w # reverse to initial position
-                
-                th = th * (2 * np.pi / 360)
-                new_x = r * np.cos(th) * self.STD_SPACE
-                new_y = r * np.sin(th) * self.STD_SPACE
-                
-                # center image on position
-                pixmap = item.pixmap()
-                item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
-            self.image_data[item]['w'] *= 0.96 # reverse to initial position
     
 
     def circles(self, images):
