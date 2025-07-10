@@ -4,6 +4,9 @@
 # deleting and updating collections and problem of duplicate collections
 # import pinterest
 # fix fast animation
+# progress for color adding
+# fix pannning
+
 import sys
 import os
 import json

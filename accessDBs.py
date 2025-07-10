@@ -26,7 +26,7 @@ transform = tfms.Compose([
     # tfms.CenterCrop(224),
     tfms.ToImage(),
     tfms.ToDtype(torch.float32, scale=True),
-    tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
 
@@ -89,6 +89,9 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", pr
 
     vectors = torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
+    if model == "dino":
+        faiss.normalize_L2(vectors)
+
     d = len(vectors[0])
     index = None
     if model == "dino":
@@ -149,6 +152,7 @@ def search_visual(name, file_path, k = -1):
     start_time = time.time()
     with torch.no_grad():
         query_embedding = dino(query_tensor).cpu().numpy()
+        faiss.normalize_L2(query_embedding)
     end_time = time.time()
     print(f"embeddding time: {end_time - start_time:.3f} seconds")
     
@@ -167,7 +171,8 @@ def search_visual(name, file_path, k = -1):
         if indices[i] < len(image_paths):
             results.append({"path": image_paths[indices[i]], "distance": distances[i]})
 
-    results.sort(key= lambda x: x["distance"])
+    # not actually distance its similarity
+    results.sort(key= lambda x: x["distance"], reverse= True)
 
     return [{"path": file_path, "distance": 0}] + results
 
@@ -208,7 +213,7 @@ def search_clip(name, query : str, k = -1):
             results.append({"path": image_paths[indices[i]], "distance": distances[i]})
 
     results.sort(key=lambda x: x["distance"])
-    
+
     return results
 
 

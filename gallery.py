@@ -153,8 +153,10 @@ class ImageGalleryApp(QMainWindow):
             #     if data_item == item:
                     path = self.image_data[item]["path"]
                     preview = None
-                    print(self.image_data[item])
+                    # print(self.image_data[item])
+                    c = False
                     if isinstance(self.image_data[item].get("colors"), (list, np.ndarray)):
+                        c = True
                         colors = self.image_data[item]["colors"]
                         image = show_palette(colors)
                         
@@ -180,7 +182,10 @@ class ImageGalleryApp(QMainWindow):
                     menu = QMenu()
                     open_file = menu.addAction("Open Image")
                     open_location = menu.addAction("Show in Folder")
-                    open_palette = menu.addAction("Show Color Palette")
+                    if c:
+                        open_palette = menu.addAction("Show Color Palette")
+                    else:
+                        open_palette == None
                     
                     # Show menu and get selected action
                     action = menu.exec_(event.screenPos())
@@ -413,7 +418,8 @@ class ImageGalleryApp(QMainWindow):
         # Add CLIP text search if supported
         if self.collection_data.get("clip", False):
             search_types.append("Text Search (CLIP)")
-            search_types.append("Image Content Search (CLIP)")
+            # just gonna let dino do image search
+            # search_types.append("Image Content Search (CLIP)")
 
         # Add Visual Similarity if DINO supported  
         if self.collection_data.get("dino", False):
@@ -776,7 +782,7 @@ class ImageGalleryApp(QMainWindow):
         
         if self.collection_data.get("clip", False):
             search_types.append("Text Search (CLIP)")
-            search_types.append("Image Content Search (CLIP)")
+            # search_types.append("Image Content Search (CLIP)")
             
             # Remove CLIP index creation button if it exists
             if hasattr(self, 'create_clip_btn') and self.create_clip_btn:
@@ -880,18 +886,16 @@ class ImageGalleryApp(QMainWindow):
             elif search_type == "Image Similarity Search (DINO)":
                 if hasattr(self, 'query_image_path') and self.query_image_path:
                     images = search_visual(name=database, file_path=self.query_image_path, k=num_images)
-                    print(images)
                 else:
                     print("No reference image selected for visual similarity")
                     return
-            
-            # just gonna let dino do image search
-            # elif search_type == "Image Content Search (CLIP)":
-            #     if hasattr(self, 'query_image_path') and self.query_image_path:
-            #         images = search_clip(database, query_image_path=self.query_image_path, k=num_images)
-            #     else:
-            #         print("No reference image selected for image search")
-            #         return
+                
+            elif search_type == "Image Content Search (CLIP)":
+                if hasattr(self, 'query_image_path') and self.query_image_path:
+                    images = search_clip(database, query_image_path=self.query_image_path, k=num_images)
+                else:
+                    print("No reference image selected for image search")
+                    return
             
             if len(images) == 0:
                 QMessageBox.warning(self, "Error", "No images found! Check if the collection folder contains images")
@@ -1376,7 +1380,7 @@ class ImageGalleryApp(QMainWindow):
                 # calculate the actual angle the image is at
                 th = (np.arctan2(-y, x) * 360 / (2 * np.pi)) % 360  # Calculate angle
 
-                self.add_to_scene(x=x, y=y, image=image, path= paths[imgct], color= colors[imgct], h=th, r=radius, initial_angle=th, direction= 1)
+                self.add_to_scene(x=x, y=y, image=image, path= paths[imgct], colors= colors[imgct], h=th, r=radius, initial_angle=th, direction= 1)
                 imgct += 1
                 
                 QApplication.processEvents()
