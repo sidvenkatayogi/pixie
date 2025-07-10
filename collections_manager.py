@@ -6,6 +6,8 @@
 # fix fast animation
 # progress for color adding
 # fix pannning
+from accessDBs import add_color
+
 
 import sys
 import os
@@ -677,37 +679,49 @@ class CollectionsLandingPage(QMainWindow):
             self.collections.append(collection_data)
             self.saveCollections()
             self.updateCollectionsDisplay()
-            
+
             # START COLOR INDEX CREATION AUTOMATICALLY
             self.createColorIndex(collection_data)
             
-            # Open the new collection
-            self.openCollection(collection_data)
+            
+
+           
 
     def createColorIndex(self, collection_data):
         """Create color index for a collection"""
-        from accessDBs import add_color
-        import threading
-        # from PyQt5.QtWidgets import QProgressDialog
-        # from PyQt5.QtCore import QThread, pyqtSignal
-        
         class IndexWorker(QThread):
             progress = pyqtSignal(int)
             finished = pyqtSignal()
+            value_changed = pyqtSignal(int)  # Add signal for progress updates
             
-            def __init__(self, name, folder, explore):
+            def __init__(self, name, folder, explore):  # Remove progress_dialog from constructor
                 super().__init__()
                 self.name = name
                 self.folder = folder
                 self.explore = explore
                 
             def run(self):
-                add_color(self.name, self.folder, self.explore)
-                self.finished.emit()
-        
+                try:
+                    # Create wrapper class to emit progress signals
+                    class ProgressEmitter:
+                        def __init__(self, signal):
+                            self.signal = signal
+                        def setValue(self, value):
+                            self.signal.emit(value)
+                            
+                    progress_emitter = ProgressEmitter(self.value_changed)
+                    add_color(self.name, self.folder, self.explore, progress=progress_emitter)
+                    self.finished.emit()
+                except Exception as e:
+                    print(f"Error in worker thread: {e}")
+
         # Show progress dialog
-        progress_dialog = QProgressDialog("Creating color index...", "Cancel", 0, 0, self)
+        progress_dialog = QProgressDialog("Creating color index...", None, 0, collection_data["image_count"], self)
         progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setWindowFlags(
+            progress_dialog.windowFlags() & ~Qt.WindowCloseButtonHint
+        )
+        progress_dialog.setMinimumDuration(0)
         progress_dialog.show()
         
         # Start worker thread
@@ -716,7 +730,12 @@ class CollectionsLandingPage(QMainWindow):
             collection_data['folder'], 
             collection_data['subfolders']
         )
-        self.index_worker.finished.connect(progress_dialog.close)
+        def x():
+            progress_dialog.close()
+            self.openCollection(collection_data)
+        # Connect signals
+        self.index_worker.value_changed.connect(progress_dialog.setValue)
+        self.index_worker.finished.connect(x)
         self.index_worker.start()
             
     def countImagesInFolder(self, folder, include_subfolders):

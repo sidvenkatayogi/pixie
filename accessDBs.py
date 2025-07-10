@@ -113,7 +113,7 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", pr
 
 
 
-def add_color(name, folder_path, explore= False):
+def add_color(name, folder_path, explore= False, progress=None):
     image_paths = []
     image_paths = get_files(folder_path, explore)
 
@@ -123,7 +123,7 @@ def add_color(name, folder_path, explore= False):
     except Exception as e:
         db = VectorDB(name= name)
 
-    for path in tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB..."):
+    for i, path in enumerate(tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB...")):
         try:
             if type(db) == VectorDB:
                 if not db.get_vector(path):
@@ -134,6 +134,9 @@ def add_color(name, folder_path, explore= False):
                 db.add_hash(path, hash)
         except Exception as e:
             print(f"Error processing {path} : {e}")
+        if progress:
+            progress.setValue(i + 1)
+            
     db.save_DB(folder_name= name)
 
 
