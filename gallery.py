@@ -13,8 +13,6 @@ from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize, QThread
 import time
 import json
-# from search_color import search
-# from add_color import add
 from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
 from colors import get_dominant_colors, show_palette
 
@@ -216,23 +214,12 @@ class ImageGalleryApp(QMainWindow):
                 subprocess.run(['open', '-R', path])
             else:  # Linux
                 subprocess.run(['xdg-open', os.path.dirname(path)])
+
     def returnToHome(self):
         if self.landing_page:
             self.landing_page.show()
         self.close()
 
-    # def setupUI(self):
-    #     main_widget = QWidget()
-    #     main_layout = QHBoxLayout(main_widget)
-        
-    #     # graphics view (left side)
-    #     main_layout.addWidget(self.view, 3)  # Give more space to the view
-        
-    #     # Control panel (right side)
-    #     control_panel = self.createControlPanel()
-    #     main_layout.addWidget(control_panel, 1)  # Smaller space for controls
-        
-    #     self.setCentralWidget(main_widget)
     def setupUI(self):
         main_widget = QWidget()
         main_layout = QHBoxLayout(main_widget)
@@ -286,14 +273,6 @@ class ImageGalleryApp(QMainWindow):
         main_layout.addWidget(self.control_panel, 1)
         
         self.setCentralWidget(main_widget)
-
-    def toggleControlPanel(self):
-        if self.control_panel.isVisible():
-            self.control_panel.hide()
-            self.toggle_panel_button.setText("<")  # Left arrow to show
-        else:
-            self.control_panel.show()
-            self.toggle_panel_button.setText(">")  # Right arrow to hide
 
     def createControlPanel(self):
         control_frame = QFrame()
@@ -398,43 +377,7 @@ class ImageGalleryApp(QMainWindow):
         self.loadonce_checkbox.setChecked(True)
         self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
         layout.addWidget(self.loadonce_checkbox)
-        
-            
-        # # Create container for load/size options
-        # options_container = QWidget()
-        # options_layout = QHBoxLayout(options_container)
-        # options_layout.setContentsMargins(0, 0, 0, 0)
-        # # Add checkbox to left side
-        # self.loadonce_checkbox = QCheckBox("Load all at once")
-        # self.loadonce_checkbox.setFont(QFont(self.font, 11))
-        # self.loadonce_checkbox.toggled.connect(self.onLoadModeChanged)
-        # options_layout.addWidget(self.loadonce_checkbox)
-        # # Add size input to right side
-        # size_container = QWidget()
-        # size_layout = QHBoxLayout(size_container)
-        # size_layout.setContentsMargins(0, 0, 0, 0)
 
-        # size_label = QLabel("Image Size:")
-        # size_label.setFont(QFont(self.font, 11))
-        # size_layout.addWidget(size_label)
-
-        # self.size_input = QLineEdit()
-        # self.size_input.setFont(QFont(self.font, 11))
-        # self.size_input.setText(str(self.STD_SIZE))
-        # self.size_input.setFixedWidth(70)
-        # self.size_input.setAlignment(Qt.AlignRight)
-        # # self.size_input.textChanged.connect(self.onSizeChanged)
-        # size_layout.addWidget(self.size_input)
-        # pxlabel = QLabel("px")
-        # pxlabel.setFont(QFont(self.font, 11))
-        # size_layout.addWidget(pxlabel)
-        # options_layout.addWidget(size_container)
-
-
-        # # Add the container to main layout
-        # layout.addWidget(options_container)
-
-        # ADD THE SEARCH/LOAD SECTION HERE
         self.search_frame = QFrame()
         self.search_frame.setFrameStyle(QFrame.StyledPanel)
         search_layout = QVBoxLayout(self.search_frame)
@@ -545,27 +488,13 @@ class ImageGalleryApp(QMainWindow):
         
         return control_frame
     
-    # def onSizeChanged(self, text):
-    #     """Handle image size input changes"""
-    #     try:
-    #         size = int(text)
-    #         # if 64 <= size <= 2048:  # Reasonable size limits
-                
-    #             # # Clear gallery if any images are displayed
-    #             # if len(self.image_data) > 0:
-    #             #     self.clearGallery()
-    #         if size > 2048:
-    #             self.STD_SIZE = 2048
-    #         elif size < 64:
-    #             self.STD_SIZE = 64
-    #         else:
-    #             self.STD_SIZE = size
-
-    #         self.STD_SPACE = self.STD_SIZE * 1.25
-    #         self.size_input.setText(str(self.STD_SIZE))
-        
-    #     except ValueError:
-    #         pass  # Invalid input, ignore
+    def toggleControlPanel(self):
+        if self.control_panel.isVisible():
+            self.control_panel.hide()
+            self.toggle_panel_button.setText("<")  # Left arrow to show
+        else:
+            self.control_panel.show()
+            self.toggle_panel_button.setText(">")  # Right arrow to hide
 
     def onRGBInputChanged(self, text):
         try:
@@ -578,142 +507,6 @@ class ImageGalleryApp(QMainWindow):
         except ValueError:
             pass  # Invalid input, ignore
 
-    def selectColorImage(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select Reference Image for Color Search", 
-            "", 
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
-        )
-        if file_path:
-            self.selected_color_image_path = file_path
-            filename = os.path.basename(file_path)
-            self.color_image_path_label.setText(f"Selected: {filename}")
-    def clearSearchControls(self):
-        # Remove all widgets from search controls layout
-        while self.search_controls_layout.count():
-            child = self.search_controls_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-    
-    def setupColorSearchControls(self):
-        self.clearSearchControls()
-        
-        # Color search mode selection
-        mode_label = QLabel("Search by:")
-        mode_label.setFont(QFont(self.font, 11))
-        self.search_controls_layout.addWidget(mode_label)
-        
-        self.color_search_mode = QComboBox()
-        self.color_search_mode.setFont(QFont(self.font, 11))
-        self.color_search_mode.addItems(["RGB Color Picker", "Reference Image"])
-        self.color_search_mode.currentTextChanged.connect(self.onColorSearchModeChanged)
-        self.search_controls_layout.addWidget(self.color_search_mode)
-        
-        # Container for dynamic controls
-        self.color_controls_container = QWidget()
-        self.color_controls_layout = QVBoxLayout(self.color_controls_container)
-        self.search_controls_layout.addWidget(self.color_controls_container)
-        
-        # Initialize with color picker mode
-        self.setupColorPickerControls()
-
-    def setupColorImageControls(self):
-        # Image selector
-        image_label = QLabel("Reference Image:")
-        image_label.setFont(QFont(self.font, 11))
-        self.color_controls_layout.addWidget(image_label)
-        
-        self.color_image_path_label = QLabel("No image selected")
-        self.color_image_path_label.setFont(QFont(self.font, 10))
-        self.color_image_path_label.setWordWrap(True)
-        self.color_image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
-        self.color_controls_layout.addWidget(self.color_image_path_label)
-        
-        self.select_color_image_button = QPushButton("Select Image")
-        self.select_color_image_button.setFont(QFont(self.font, 11))
-        self.select_color_image_button.clicked.connect(self.selectColorImage)
-        self.color_controls_layout.addWidget(self.select_color_image_button)
-    def setupColorPickerControls(self):
-        # Color picker button
-        color_label = QLabel("Select Color:")
-        color_label.setFont(QFont(self.font, 11))
-        self.color_controls_layout.addWidget(color_label)
-        
-        self.color_button = QPushButton()
-        self.color_button.setFixedHeight(40)
-        self.color_button.setStyleSheet(f"background-color: {self.selected_color.name()}; border: 2px solid #666;")
-        self.color_button.clicked.connect(self.selectColor)
-        self.color_controls_layout.addWidget(self.color_button)
-        
-        # # Optional: RGB input field for manual entry
-        # rgb_label = QLabel("Or enter RGB values:")
-        # self.color_controls_layout.addWidget(rgb_label)
-        
-        # self.rgb_input = QLineEdit()
-        # self.rgb_input.setPlaceholderText("R,G,B (e.g., 255,128,0)")
-        # self.rgb_input.textChanged.connect(self.onRGBInputChanged)
-        # self.color_controls_layout.addWidget(self.rgb_input)
-
-
-    def onColorSearchModeChanged(self, mode):
-        # Clear existing controls
-        while self.color_controls_layout.count():
-            child = self.color_controls_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        
-        if mode == "RGB Color Picker":
-            self.setupColorPickerControls()
-        else:  # Reference Image
-            self.setupColorImageControls()
-
-    def setupTextSearchControls(self):
-        self.clearSearchControls()
-        
-        # Text input
-        text_label = QLabel("Search Query:")
-        text_label.setFont(QFont(self.font, 11))
-        self.search_controls_layout.addWidget(text_label)
-        
-        self.text_input = QLineEdit()
-        self.text_input.setFont(QFont(self.font, 11))
-        self.text_input.setPlaceholderText("Enter search text...")
-        self.search_controls_layout.addWidget(self.text_input)
-    
-    def setupVisualSimilarityControls(self):
-        self.clearSearchControls()
-        
-        # Image selector
-        image_label = QLabel("Reference Image:")
-        image_label.setFont(QFont(self.font, 11))
-        self.search_controls_layout.addWidget(image_label)
-        
-        self.image_path_label = QLabel("No image selected")
-        self.image_path_label.setFont(QFont(self.font, 11))
-        self.image_path_label.setWordWrap(True)
-        self.image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
-        self.search_controls_layout.addWidget(self.image_path_label)
-        
-        self.select_image_button = QPushButton("Select Image")
-        self.select_image_button.setFont(QFont(self.font, 11))
-        self.select_image_button.clicked.connect(self.selectImage)
-        self.search_controls_layout.addWidget(self.select_image_button)
-    
-    def setupImageSearchControls(self):
-        # Same as visual similarity for now
-        self.setupVisualSimilarityControls()
-    
-    def onSearchTypeChanged(self, search_type):
-        if search_type == "Color Search":
-            self.setupColorSearchControls()
-        elif search_type == "Text Search (CLIP)":
-            self.setupTextSearchControls()
-        elif search_type == "Image Similarity Search (DINO)":
-            self.setupVisualSimilarityControls()
-        elif search_type == "Image Content Search (CLIP)":
-            self.setupImageSearchControls()
-    
     def selectColor(self):
         # color = QColorDialog.getColor(self.selected_color, self, "Select Color")
         color = colorPicker.getColor(self.selected_color, self, "Select Color")
@@ -746,6 +539,143 @@ class ImageGalleryApp(QMainWindow):
             # Show just the filename for brevity
             filename = os.path.basename(file_path)
             self.image_path_label.setText(f"Selected: {filename}")
+
+    def selectColorImage(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Reference Image for Color Search", 
+            "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.selected_color_image_path = file_path
+            filename = os.path.basename(file_path)
+            self.color_image_path_label.setText(f"Selected: {filename}")
+    
+    def selectQueryImage(self):
+        """Select query image for similarity search"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Query Image", "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
+        )
+        if file_path:
+            self.query_image_path = file_path
+            # Show selected image path
+            if hasattr(self, 'query_image_label'):
+                self.query_image_label.setText(f"Selected: {os.path.basename(file_path)}")
+
+    def setupColorSearchControls(self):
+        self.clearSearchControls()
+        
+        # Color search mode selection
+        mode_label = QLabel("Search by:")
+        mode_label.setFont(QFont(self.font, 11))
+        self.search_controls_layout.addWidget(mode_label)
+        
+        self.color_search_mode = QComboBox()
+        self.color_search_mode.setFont(QFont(self.font, 11))
+        self.color_search_mode.addItems(["RGB Color Picker", "Reference Image"])
+        self.color_search_mode.currentTextChanged.connect(self.onColorSearchModeChanged)
+        self.search_controls_layout.addWidget(self.color_search_mode)
+        
+        # Container for dynamic controls
+        self.color_controls_container = QWidget()
+        self.color_controls_layout = QVBoxLayout(self.color_controls_container)
+        self.search_controls_layout.addWidget(self.color_controls_container)
+        
+        # Initialize with color picker mode
+        self.setupColorPickerControls()
+
+    def onColorSearchModeChanged(self, mode):
+        # Clear existing controls
+        while self.color_controls_layout.count():
+            child = self.color_controls_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        if mode == "RGB Color Picker":
+            self.setupColorPickerControls()
+        else:  # Reference Image
+            self.setupColorImageControls()
+
+    def clearSearchControls(self):
+        # Remove all widgets from search controls layout
+        while self.search_controls_layout.count():
+            child = self.search_controls_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def setupColorPickerControls(self):
+        # Color picker button
+        color_label = QLabel("Select Color:")
+        color_label.setFont(QFont(self.font, 11))
+        self.color_controls_layout.addWidget(color_label)
+        
+        self.color_button = QPushButton()
+        self.color_button.setFixedHeight(40)
+        self.color_button.setStyleSheet(f"background-color: {self.selected_color.name()}; border: 2px solid #666;")
+        self.color_button.clicked.connect(self.selectColor)
+        self.color_controls_layout.addWidget(self.color_button)
+
+    def setupColorImageControls(self):
+        # Image selector
+        image_label = QLabel("Reference Image:")
+        image_label.setFont(QFont(self.font, 11))
+        self.color_controls_layout.addWidget(image_label)
+        
+        self.color_image_path_label = QLabel("No image selected")
+        self.color_image_path_label.setFont(QFont(self.font, 10))
+        self.color_image_path_label.setWordWrap(True)
+        self.color_image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
+        self.color_controls_layout.addWidget(self.color_image_path_label)
+        
+        self.select_color_image_button = QPushButton("Select Image")
+        self.select_color_image_button.setFont(QFont(self.font, 11))
+        self.select_color_image_button.clicked.connect(self.selectColorImage)
+        self.color_controls_layout.addWidget(self.select_color_image_button)
+
+
+    def setupTextSearchControls(self):
+        self.clearSearchControls()
+        
+        # Text input
+        text_label = QLabel("Search Query:")
+        text_label.setFont(QFont(self.font, 11))
+        self.search_controls_layout.addWidget(text_label)
+        
+        self.text_input = QLineEdit()
+        self.text_input.setFont(QFont(self.font, 11))
+        self.text_input.setPlaceholderText("Enter search text...")
+        self.search_controls_layout.addWidget(self.text_input)
+    
+    def setupImageSearchControls(self):
+        self.clearSearchControls()
+        
+        # Image selector
+        image_label = QLabel("Reference Image:")
+        image_label.setFont(QFont(self.font, 11))
+        self.search_controls_layout.addWidget(image_label)
+        
+        self.image_path_label = QLabel("No image selected")
+        self.image_path_label.setFont(QFont(self.font, 11))
+        self.image_path_label.setWordWrap(True)
+        self.image_path_label.setStyleSheet("border: 2px solid #ccc; padding: 5px; background-color: #ffffff;")
+        self.search_controls_layout.addWidget(self.image_path_label)
+        
+        self.select_image_button = QPushButton("Select Image")
+        self.select_image_button.setFont(QFont(self.font, 11))
+        self.select_image_button.clicked.connect(self.selectImage)
+        self.search_controls_layout.addWidget(self.select_image_button)
+    
+    def onSearchTypeChanged(self, search_type):
+        if search_type == "Color Search":
+            self.setupColorSearchControls()
+        elif search_type == "Text Search (CLIP)":
+            self.setupTextSearchControls()
+        elif search_type == "Image Similarity Search (DINO)":
+            self.setupImageSearchControls()
+        elif search_type == "Image Content Search (CLIP)":
+            self.setupImageSearchControls()
     
     def updateImageCountLabel(self, value):
         self.image_count_label.setText(str(value))
@@ -755,6 +685,12 @@ class ImageGalleryApp(QMainWindow):
         self.animation_timer.stop()
         self.zoom_animation_timer.stop()
         
+        # Stop any active worker threads
+        if hasattr(self, 'index_worker') and self.index_worker:
+            if self.index_worker.isRunning():
+                self.index_worker.terminate()
+                self.index_worker.wait()
+
         # Clear scene
         self.scene.clear()
         self.image_data.clear()
@@ -835,29 +771,18 @@ class ImageGalleryApp(QMainWindow):
             self.search_input_layout.addWidget(image_select_btn)
         
         # Search button
+        print("sjfhafihfua")
         search_btn = QPushButton("Search")
         search_btn.clicked.connect(self.performSearch)
         self.search_input_layout.addWidget(search_btn)
-
-    def selectQueryImage(self):
-        """Select query image for similarity search"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Query Image", "", 
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
-        )
-        if file_path:
-            self.query_image_path = file_path
-            # Show selected image path
-            if hasattr(self, 'query_image_label'):
-                self.query_image_label.setText(f"Selected: {os.path.basename(file_path)}")
 
     def createIndex(self, index_type):
         """Create similarity search index"""
         if not self.collection_data:
             return
-            
-        from accessDBs import add_visual
-        from PyQt5.QtCore import QThread, pyqtSignal
+        
+        # from accessDBs import add_visual
+        # from PyQt5.QtCore import QThread, pyqtSignal
         
 
         class IndexCreationWorker(QThread):
@@ -968,7 +893,7 @@ class ImageGalleryApp(QMainWindow):
         if not self.collection_data or self.current_search_mode == "browse":
             return
             
-        from accessDBs import search_color, search_clip, search_visual
+        # from accessDBs import search_color, search_clip, search_visual
         
         try:
             results = []
@@ -986,7 +911,7 @@ class ImageGalleryApp(QMainWindow):
                 if hasattr(self, 'text_input') and self.text_input.text():
                     results = search_clip(name, self.text_input.text())
                 elif hasattr(self, 'query_image_path'):
-                    # For CLIP image search, you'd need to modify accessDBs.py
+                    # you can use clip with an image, but i'll just leave it for the dino
                     pass
                     
             elif self.current_search_mode == "dino":
@@ -1022,8 +947,8 @@ class ImageGalleryApp(QMainWindow):
             self.addImageToGrid(result['path'])
             self.current_result_index += 1
             
-            # Schedule next load
-            QTimer.singleShot(100, self.loadNextSearchResult)
+            # # Schedule next load
+            # QTimer.singleShot(100, self.loadNextSearchResult)
 
     def generateGallery(self):
         # Clear existing gallery first
@@ -1049,13 +974,10 @@ class ImageGalleryApp(QMainWindow):
                 self.STD_SIZE = 32
             else:
                 self.STD_SIZE = image_size
-
-            self.STD_SPACE = self.STD_SIZE * 1.25
-            
-        
         except ValueError:
-            pass  # Invalid input, ignore
+            self.STD_SIZE = 512
 
+        self.STD_SPACE = self.STD_SIZE * 1.25
         self.size_input.setText(str(self.STD_SIZE))
 
         try:

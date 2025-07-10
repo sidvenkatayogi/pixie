@@ -1,13 +1,9 @@
 # TODO
-# fix double populating when generating galleries more than once when images are scaling
-# show palettes
-# progress bar for color making or save palettes
 # add collection_id so renaming doesn't change files or folders for indexes
-# check y its taking so long to open imagaes
 # choose between colorpickers
-# zoom not centered
 # deleting and updating collections and problem of duplicate collections
-
+# import pinterest
+# fix fast animation
 import sys
 import os
 import json
