@@ -106,10 +106,11 @@ class CustomGraphicsView(QGraphicsView):
 
 
 class ImageGalleryApp(QMainWindow):
-    def __init__(self, collection_data, font= "Arial"):
+    def __init__(self, uuid, collection_data, font= "Arial"):
         super().__init__()
         self.font = font
         self.landing_page = None
+        self.uuid = uuid
         self.collection_data = collection_data
         # self.current_search_mode = "browse"  # browse, color, clip, dino
         self.setWindowTitle("Image Gallery")
@@ -125,7 +126,7 @@ class ImageGalleryApp(QMainWindow):
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
-        self.FPS = 60
+        self.FPS = 180
         self.animation_time = 0.0
 
         self.zoom_animation_timer = QTimer()
@@ -182,10 +183,10 @@ class ImageGalleryApp(QMainWindow):
                     menu = QMenu()
                     open_file = menu.addAction("Open Image")
                     open_location = menu.addAction("Show in Folder")
+                    open_palette = None
                     if c:
                         open_palette = menu.addAction("Show Color Palette")
-                    else:
-                        open_palette == None
+                        
                     
                     # Show menu and get selected action
                     action = menu.exec_(event.screenPos())
@@ -717,9 +718,9 @@ class ImageGalleryApp(QMainWindow):
             finished = pyqtSignal()
             error = pyqtSignal(str)
             
-            def __init__(self, name, folder, explore, index_type, progress_dialog):
+            def __init__(self, key, folder, explore, index_type, progress_dialog):
                 super().__init__()
-                self.name = name
+                self.key = key
                 self.folder = folder 
                 self.explore = explore
                 self.index_type = index_type
@@ -728,7 +729,7 @@ class ImageGalleryApp(QMainWindow):
             def run(self):
                 try:
                     self.progress.emit(f"Creating {self.index_type.upper()} index...")
-                    add_visual(self.name, self.folder, self.explore, model=self.index_type, progress= self.progress_dialog)
+                    add_visual(self.key, self.folder, self.explore, model=self.index_type, progress= self.progress_dialog)
                     self.finished.emit()
                 except Exception as e:
                     self.error.emit(str(e))
@@ -741,7 +742,8 @@ class ImageGalleryApp(QMainWindow):
         
         # Start worker
         self.index_worker = IndexCreationWorker(
-            self.collection_data['name'],
+            # self.collection_data['name'],
+            self.uuid,
             self.collection_data['folder'], 
             self.collection_data['subfolders'],
             index_type,
@@ -757,9 +759,7 @@ class ImageGalleryApp(QMainWindow):
             collections = []
             with open("collections.json", 'r') as f:
                 collections = json.load(f)
-                for i, c in enumerate(collections):
-                    if c["name"] == self.collection_data["name"]:
-                        collections[i][index_type] = self.collection_data[index_type]
+                collections[self.uuid] = self.collection_data
             
             with open("collections.json", 'w') as f:
                 json.dump(collections, f, indent=2)
@@ -820,7 +820,7 @@ class ImageGalleryApp(QMainWindow):
         
         # Get parameters from UI
         num_images = self.image_count_slider.value()
-        database = self.collection_data["name"]
+        database = self.uuid
         search_type = self.search_type_combo.currentText()
         layout_type = self.layout_buttons.checkedId()
         image_size = self.size_input.text()
@@ -1024,7 +1024,8 @@ class ImageGalleryApp(QMainWindow):
                 # center image on position
                 pixmap = item.pixmap()
                 item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
-            self.image_data[item]['w'] *= 0.96 # reverse to initial position
+            # self.image_data[item]['w'] *= 0.96 # reverse to initial position
+            self.image_data[item]['w'] *= 0.98 # reverse to initial position
 
     def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)

@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QFileDialog, QCheckBox, QMessageBox, QComboBox, QMenu, QInputDialog, QMessageBox)
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
-
+from uuid import uuid4
 print(0)
 
 # Import the gallery app
@@ -31,11 +31,13 @@ class CollectionThumbnail(QFrame):
     clicked = pyqtSignal(dict)
     collection_updated = pyqtSignal()  # New signal for updates
     
-    def __init__(self, collection_data, parent=None, font="Arial"):
+    def __init__(self, uuid, collection_data, parent=None, font="Arial"):
         super().__init__(parent)
         self.font = font
+        self.uuid = uuid
         self.collection_data = collection_data
         self.setupUI()
+        
         
     def setupUI(self):
         self.setFixedSize(200, 250)
@@ -126,25 +128,6 @@ class CollectionThumbnail(QFrame):
         # Add info container to main layout
         layout.addWidget(info_container)
         
-        # # Collection name - no box, left aligned
-        # name_label = QLabel(self.collection_data.get('name', 'Untitled'))
-        # name_label.setFont(QFont(self.font, 12, QFont.Bold))
-        # name_label.setAlignment(Qt.AlignLeft)
-        # name_label.setWordWrap(True)
-        # # Remove any styling that might create boxes or hover effects
-        # name_label.setStyleSheet("border: none; background: transparent;")
-        # layout.addWidget(name_label)
-        
-        # # Collection info - no box, left aligned, no spacing above
-        # image_count = self.collection_data.get('image_count', 0)
-        # date_updated = self.collection_data.get('last_updated', '')
-        
-        # info_label = QLabel(f"{image_count} Images\n{date_updated}")
-        # info_label.setFont(QFont(self.font, 9))
-        # info_label.setAlignment(Qt.AlignLeft)
-        # info_label.setStyleSheet("color: #666; border: none; background: transparent; margin-top: 0px;")
-        # layout.addWidget(info_label)
-        
         
     def loadThumbnail(self):
         thumbnail_path = self.collection_data.get('thumbnail_path', '')
@@ -161,15 +144,15 @@ class CollectionThumbnail(QFrame):
     def showMenu(self):
         menu = QMenu(self)
         menu.setFont(QFont(self.font, 10))
-        # rename_action = menu.addAction("Rename Collection")
+        rename_action = menu.addAction("Rename Collection")
         change_thumb_action = menu.addAction("Change Thumbnail")
         
         action = menu.exec_(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
         
-        # if action == rename_action:
-        #     self.renameCollection()
-        # elif action == change_thumb_action:
-        #     self.changeThumbnail()
+        if action == rename_action:
+            self.renameCollection()
+        elif action == change_thumb_action:
+            self.changeThumbnail()
         if action == change_thumb_action:
             self.changeThumbnail()
 
@@ -182,9 +165,9 @@ class CollectionThumbnail(QFrame):
             self.collection_data['name']
         )
         if ok and len(new_name.strip()) > 0:
-            old_name = self.collection_data['name']  # Store old name before updating
+            # old_name = self.collection_data['name']  # Store old name before updating
             self.collection_data['name'] = new_name.strip()
-            self.updateCollectionsFile(old_name)  # Pass old name to update method
+            self.updateCollectionsFile()  # Pass old name to update method
             self.collection_updated.emit()
 
     def changeThumbnail(self):
@@ -201,16 +184,12 @@ class CollectionThumbnail(QFrame):
             self.updateCollectionsFile()
             self.collection_updated.emit()
 
-    def updateCollectionsFile(self, old_name):
-        """Update collection in json file using old name to find the correct entry"""
+    def updateCollectionsFile(self):
         try:
             with open('collections.json', 'r') as f:
                 collections = json.load(f)
                 
-            for i, collection in enumerate(collections):
-                if collection['name'] == old_name:  # Match using old name
-                    collections[i] = self.collection_data
-                    break
+            collections[self.uuid] = self.collection_data
                     
             with open('collections.json', 'w') as f:
                 json.dump(collections, f, indent=2)
@@ -479,14 +458,12 @@ class CreateCollectionDialog(QDialog):
         self.accept()
         
     def getCollectionData(self):
-        return {
-            'name': self.name_input.text().strip(),
-            'folder': self.selected_folder,
-            'subfolders': self.subfolders_checkbox.isChecked(),
-            'thumbnail_path': self.selected_thumbnail,
-            'last_updated': datetime.now().strftime("%m/%d/%Y"),
-            'created_date': datetime.now().isoformat()
-        }
+        return  {'name': self.name_input.text().strip(),
+                'folder': self.selected_folder,
+                'subfolders': self.subfolders_checkbox.isChecked(),
+                'thumbnail_path': self.selected_thumbnail,
+                'last_updated': datetime.now().strftime("%m/%d/%Y"),
+                'created_date': datetime.now().isoformat()}
 
 
 class CollectionsLandingPage(QMainWindow):
@@ -500,7 +477,7 @@ class CollectionsLandingPage(QMainWindow):
         self.loadCustomFont()
 
         # Collections data
-        self.collections = []
+        self.collections = {}
         self.collections_file = "collections.json"
         
         self.setupUI()
@@ -608,9 +585,9 @@ class CollectionsLandingPage(QMainWindow):
                     self.collections = json.load(f)
             except Exception as e:
                 print(f"Error loading collections: {e}")
-                self.collections = []
+                self.collections = {}
         else:
-            self.collections = []
+            self.collections = {}
             
         self.updateCollectionsDisplay()
         
@@ -618,7 +595,7 @@ class CollectionsLandingPage(QMainWindow):
         """Save collections to JSON file"""
         try:
             with open(self.collections_file, 'w') as f:
-                json.dump(self.collections, f, indent=2)
+                json.dump(self.collections, f, indent=4)
         except Exception as e:
             print(f"Error saving collections: {e}")
             
@@ -637,26 +614,46 @@ class CollectionsLandingPage(QMainWindow):
             
             # Add collection thumbnails
             cols = 4  # Number of columns
-            for i, collection in enumerate(self.collections):
+            for i, cd in enumerate(self.collections.items()):
+                uuid, collection = cd
                 row = i // cols
                 col = i % cols
                 
-                thumbnail = CollectionThumbnail(collection, font=self.font)
+                thumbnail = CollectionThumbnail(uuid, collection, font=self.font)
                 thumbnail.clicked.connect(self.openCollection)
                 thumbnail.collection_updated.connect(self.loadCollections)  # Refresh when updated
                 self.collections_layout.addWidget(thumbnail, row, col)
                 
     def sortCollections(self, sort_by):
         """Sort collections based on selected criteria"""
+        sorted_items = []
+    
         if sort_by == "Name":
-            self.collections.sort(key=lambda x: x.get('name', '').lower())
+            sorted_items = sorted(
+                self.collections.items(),
+                key=lambda x: x[1]['name'].lower()  # x[1] is the nested dictionary, get 'name' from it
+            )
         elif sort_by == "Date Created":
-            self.collections.sort(key=lambda x: x.get('created_date', ''), reverse=True)
+            sorted_items = sorted(
+                self.collections.items(),
+                key=lambda x: x[1]['created_date'],
+                reverse=True
+            )
         elif sort_by == "Date Modified":
-            self.collections.sort(key=lambda x: x.get('last_updated', ''), reverse=True)
+            sorted_items = sorted(
+                self.collections.items(),
+                key=lambda x: x[1]['last_updated'],
+                reverse=True
+            )
         elif sort_by == "Image Count":
-            self.collections.sort(key=lambda x: x.get('image_count', 0), reverse=True)
-            
+            sorted_items = sorted(
+                self.collections.items(),
+                key=lambda x: x[1]['image_count'],
+                reverse=True
+            )
+        
+        # Convert sorted list of tuples back to dictionary
+        self.collections = dict(sorted_items)
         self.updateCollectionsDisplay()
         
     def createNewCollection(self):
@@ -674,29 +671,27 @@ class CollectionsLandingPage(QMainWindow):
             collection_data['dino'] = False
             collection_data['clip'] = False
             collection_data['image_count'] = image_count
+            # collection_data['id'] = str(uuid4())
             
             # Add to collections
-            self.collections.append(collection_data)
+            uuid = str(uuid4())
+            self.collections[uuid] = collection_data
             self.saveCollections()
             self.updateCollectionsDisplay()
 
-            # START COLOR INDEX CREATION AUTOMATICALLY
-            self.createColorIndex(collection_data)
-            
+            self.createColorIndex(uuid, collection_data)
             
 
-           
-
-    def createColorIndex(self, collection_data):
+    def createColorIndex(self, uuid, collection_data):
         """Create color index for a collection"""
         class IndexWorker(QThread):
             progress = pyqtSignal(int)
             finished = pyqtSignal()
             value_changed = pyqtSignal(int)  # Add signal for progress updates
             
-            def __init__(self, name, folder, explore):  # Remove progress_dialog from constructor
+            def __init__(self, key, folder, explore):  # Remove progress_dialog from constructor
                 super().__init__()
-                self.name = name
+                self.key = key
                 self.folder = folder
                 self.explore = explore
                 
@@ -710,7 +705,7 @@ class CollectionsLandingPage(QMainWindow):
                             self.signal.emit(value)
                             
                     progress_emitter = ProgressEmitter(self.value_changed)
-                    add_color(self.name, self.folder, self.explore, progress=progress_emitter)
+                    add_color(self.key, self.folder, self.explore, progress=progress_emitter)
                     self.finished.emit()
                 except Exception as e:
                     print(f"Error in worker thread: {e}")
@@ -726,13 +721,13 @@ class CollectionsLandingPage(QMainWindow):
         
         # Start worker thread
         self.index_worker = IndexWorker(
-            collection_data['name'], 
+            uuid, 
             collection_data['folder'], 
             collection_data['subfolders']
         )
         def x():
             progress_dialog.close()
-            self.openCollection(collection_data)
+            self.openCollection(uuid, collection_data)
         # Connect signals
         self.index_worker.value_changed.connect(progress_dialog.setValue)
         self.index_worker.finished.connect(x)
@@ -759,9 +754,9 @@ class CollectionsLandingPage(QMainWindow):
             
         return count
         
-    def openCollection(self, collection_data):
+    def openCollection(self, uuid, collection_data):
         # Create gallery window without parent
-        self.gallery_window = ImageGalleryApp(collection_data)  # Remove parent parameter
+        self.gallery_window = ImageGalleryApp(uuid, collection_data)  # Remove parent parameter
         
         # Set window flags to make it appear in taskbar
         self.gallery_window.setWindowFlags(Qt.Window)
