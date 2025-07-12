@@ -122,7 +122,7 @@ class ImageGalleryApp(QMainWindow):
         self.image_data = {}
         self.pixmaps = {}
         self.STD_SIZE = 512
-        self.STD_SPACE = self.STD_SIZE * 1.25
+        self.STD_SPACE = self.STD_SIZE * 1.4
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
@@ -838,7 +838,7 @@ class ImageGalleryApp(QMainWindow):
         except ValueError:
             self.STD_SIZE = 512
 
-        self.STD_SPACE = self.STD_SIZE * 1.25
+        self.STD_SPACE = self.STD_SIZE * 1.4
         self.size_input.setText(str(self.STD_SIZE))
 
         try:
@@ -967,16 +967,15 @@ class ImageGalleryApp(QMainWindow):
             return
         
         self.zoom_elapsed += int(1000/(self.FPS))
-        
-        if self.zoom_elapsed >= self.zoom_duration:
+        t = self.zoom_elapsed / self.zoom_duration
+
+        if t >= 1:
             self.view.fitInView(self.zoom_target_rect, Qt.KeepAspectRatio)
             self.zoom_animation_timer.stop()
             self.zoom_animating = False
             return
         
-        t = self.zoom_elapsed / self.zoom_duration
-        
-        eased_progress = self.ease_out_exp(t)
+        eased_progress = self.ease_out_pow(t, 6)
         
         current_scale = self.zoom_start_scale + (1.0 - self.zoom_start_scale) * eased_progress
         
@@ -1002,11 +1001,15 @@ class ImageGalleryApp(QMainWindow):
         return 1 - (1 - t)**3 if t != 1 else 1
 
     def ease_out_exp(self, t):
-        return 1 - np.exp(-5 * t) if t != 1 else 1 # for floating point
+        # return 1 - np.exp(-5 * t) if t != 1 else 1 # for floating point
+        return 1 - np.exp(-5 * t) # for floating point
+    
+    def ease_out_pow(self, t, pow=2):
+        return -(t-1)**pow + 1
 
     # rotation
     def update_animation(self):
-        self.animation_time += (int(1000/self.FPS) / 1000) # 60 FPS
+        self.animation_time += (int(1000/self.FPS) / 1000)
         
         for item, data in self.image_data.items():
             # item = data['item']

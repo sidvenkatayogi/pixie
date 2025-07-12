@@ -620,7 +620,7 @@ class CollectionsLandingPage(QMainWindow):
                 col = i % cols
                 
                 thumbnail = CollectionThumbnail(uuid, collection, font=self.font)
-                thumbnail.clicked.connect(self.openCollection)
+                thumbnail.clicked.connect(lambda: self.openCollection(uuid, collection))
                 thumbnail.collection_updated.connect(self.loadCollections)  # Refresh when updated
                 self.collections_layout.addWidget(thumbnail, row, col)
                 
