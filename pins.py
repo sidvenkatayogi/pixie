@@ -32,9 +32,10 @@ def download_board(url):
 
         # 2. Save Scraped Data to JSON
         # Convert scraped data into a dictionary and save it to a JSON file for future access
-        images_data = [img.to_dict() for img in scraped_images]
-        with open("art.json", "w") as f:
-            json.dump(images_data, f, indent=4)
+        # images_data = [img.to_dict() for img in scraped_images]
+        # with open("art.json", "w") as f:
+        #     json.dump(images_data, f, indent=4)
+        #TODO use alt text instead of embedding every image with clip
 
         # 3. Download Images
         # Download images to a specified directory

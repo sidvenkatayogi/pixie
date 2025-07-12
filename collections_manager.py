@@ -6,7 +6,7 @@
 # fix fast animation
 # progress for color adding
 # fix pannning
-from accessDBs import add_color
+
 
 
 import sys
@@ -221,170 +221,385 @@ class CreateCollectionDialog(QDialog):
     def __init__(self, parent=None, font= "Arial"):
         super().__init__(parent)
         self.font = font
+        self.current_import = 0
         self.setWindowTitle("Create New Collection")
         self.setModal(True)
-        self.setFixedSize(500, 220)
+        self.setFixedSize(500, 240)
         self.setupUI()
         
     def setupUI(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Main content area with two columns
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(15)
-        
-        # Left column for form fields
-        left_column = QVBoxLayout()
-        left_column.setSpacing(6)
-        
-        # Collection name section
-        left_column.addWidget(QLabel("Collection Name:"))
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Enter collection name...")
-        self.name_input.setMinimumHeight(24)
-        left_column.addWidget(self.name_input)
-        
-        # Folder section
-        left_column.addWidget(QLabel("Folder:"))
-        folder_layout = QHBoxLayout()
-        folder_layout.setSpacing(6)
-        
-        self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Select folder containing images...")
-        self.folder_input.setReadOnly(True)
-        self.folder_input.setMinimumHeight(24)
-        folder_layout.addWidget(self.folder_input)
-        
-        self.browse_button = QPushButton("Browse")
-        self.browse_button.setMinimumHeight(24)
-        self.browse_button.setMaximumWidth(65)
-        self.browse_button.clicked.connect(self.selectFolder)
-        folder_layout.addWidget(self.browse_button)
-        
-        left_column.addLayout(folder_layout)
-        
-        # Include subfolders checkbox
-        self.subfolders_checkbox = QCheckBox("Include Subfolders")
-        self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
+        self.layout = QVBoxLayout(self)
+        self.layout.setSpacing(10)
+        self.layout.setContentsMargins(15, 15, 15, 15)
 
-        self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
-        left_column.addWidget(self.subfolders_checkbox)
         
-        # Folder status label
-        self.folder_status_label = QLabel("")
-        self.folder_status_label.setWordWrap(True)
-        self.folder_status_label.setMinimumHeight(18)
-        self.folder_status_label.setStyleSheet("font-size: 10px;")
-        left_column.addWidget(self.folder_status_label)
+
+        self.setupFolderUI()
+
+    def clearLayout(self, layout):
+        for i in reversed(range(layout.count())):
+            item = layout.itemAt(i)
+            if isinstance(item, (QHBoxLayout, QVBoxLayout)):
+                self.clearLayout(item)
+            if item:    
+                widgetToRemove = layout.itemAt(i).widget()
+                # remove it from the layout list
+                layout.removeWidget(widgetToRemove)
+                # remove it from the gui
+                if widgetToRemove:
+                    widgetToRemove.deleteLater()
+
+    def resetUI(self):
+        self.clearLayout(self.layout)
+        print("hi")
+        self.import_layout = QHBoxLayout()
+        self.folder_button = QPushButton("From Folder")
+        self.folder_button.clicked.connect(self.setupFolderUI)
+        self.folder_button.setContentsMargins(0, 0, 5, 0)
+        self.import_layout.addWidget(self.folder_button)
         
-        content_layout.addLayout(left_column, 2)
+
+        self.pinterest_button = QPushButton("From Pinterest")
+        self.pinterest_button.clicked.connect(self.setupPinterestUI)
+        self.import_layout.addWidget(self.pinterest_button)
+
+        self.import_layout.addStretch()
         
-        # Right column for thumbnail and buttons
-        right_column = QVBoxLayout()
-        right_column.setSpacing(6)
-        
-        # Thumbnail preview section
-        thumbnail_label = QLabel("Thumbnail Preview")
-        thumbnail_label.setAlignment(Qt.AlignCenter)
-        thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
-        right_column.addWidget(thumbnail_label)
-        
-        self.thumbnail_preview = QLabel()
-        self.thumbnail_preview.setFixedSize(120, 90)  # Slightly larger thumbnail
-        self.thumbnail_preview.setAlignment(Qt.AlignCenter)
-        self.thumbnail_preview.setStyleSheet("""
-            QLabel {
-                border: 2px solid #ccc;
-                border-radius: 5px;
-                background-color: #f8f8f8;
-                color: #666;
-                font-size: 10px;
-            }
-        """)
-        self.thumbnail_preview.setText("No thumbnail\nselected")
-        right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
-        
-        # Add some spacing after thumbnail
-        right_column.addSpacing(6)
-        
-        self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
-        self.choose_thumbnail_button.setMinimumHeight(24)
-        self.choose_thumbnail_button.setFixedWidth(120)
-        self.choose_thumbnail_button.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 5px;
-                font-size: 10px;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-        """)
-        self.choose_thumbnail_button.clicked.connect(self.selectThumbnail)
-        right_column.addWidget(self.choose_thumbnail_button, 0, Qt.AlignHCenter)
-        
-        # Add spacing before buttons
-        right_column.addSpacing(12)
-        
-        # Action buttons - positioned to the right
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()  # Push buttons to the right
-        button_layout.setSpacing(8)
-        
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setMinimumHeight(26)
-        self.cancel_button.setMinimumWidth(75)
-        self.cancel_button.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 5px 10px;
-                font-size: 10px;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-        """)
-        self.cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(self.cancel_button)
-        
-        self.create_button = QPushButton("Create")
-        self.create_button.setMinimumHeight(26)
-        self.create_button.setMinimumWidth(75)
-        self.create_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                font-weight: bold;
-                border-radius: 4px;
-                font-size: 10px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.create_button.clicked.connect(self.createCollection)
-        button_layout.addWidget(self.create_button)
-        
-        right_column.addLayout(button_layout)
-        
-        # Add stretch to push everything to top
-        right_column.addStretch()
-        
-        content_layout.addLayout(right_column, 1)
-        
-        layout.addLayout(content_layout)
-        
-        # Initialize variables
-        self.selected_folder = ""
-        self.selected_thumbnail = ""
+    def setupPinterestUI(self):
+        if self.current_import != 2:
+            self.resetUI()
+            # Main content area with two columns
+            content_layout = QHBoxLayout()
+            content_layout.setSpacing(15)
+            
+            # Left column for form fields
+            left_column = QVBoxLayout()
+            left_column.setSpacing(6)
+            
+            left_column.addLayout(self.import_layout)
+
+            url_box = QVBoxLayout()
+            # Collection name section
+            url_label = QLabel("Public Board URL:")
+            url_label.setFont(QFont(self.font, 11))
+            url_box.addWidget(url_label)
+            
+            self.name_input = QLineEdit()
+            self.name_input.setFont(QFont(self.font, 11))
+            self.name_input.setPlaceholderText("pinterest.com/user/board")
+            self.name_input.setMinimumHeight(32)
+            url_box.addWidget(self.name_input)
+
+            
+
+            # left_column.addStretch()
+            
+            # # Folder section
+            # left_column.addWidget(QLabel("Folder:"))
+            # folder_layout = QHBoxLayout()
+            # folder_layout.setSpacing(6)
+            
+            # self.folder_input = QLineEdit()
+            # self.folder_input.setPlaceholderText("Select folder containing images...")
+            # self.folder_input.setReadOnly(True)
+            # self.folder_input.setMinimumHeight(24)
+            # folder_layout.addWidget(self.folder_input)
+            
+            # self.browse_button = QPushButton("Browse")
+            # self.browse_button.setMinimumHeight(24)
+            # self.browse_button.setMaximumWidth(65)
+            # self.browse_button.clicked.connect(self.selectFolder)
+            # folder_layout.addWidget(self.browse_button)
+            
+            # left_column.addLayout(folder_layout)
+            
+            # # Include subfolders checkbox
+            # self.subfolders_checkbox = QCheckBox("Include Subfolders")
+            # self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
+
+            # self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
+            # left_column.addWidget(self.subfolders_checkbox)
+            
+            # # Folder status label
+            self.folder_status_label = QLabel("")
+            self.folder_status_label.setWordWrap(True)
+            self.folder_status_label.setMinimumHeight(18)
+            self.folder_status_label.setStyleSheet("font-size: 10px;")
+            self.folder_status_label.setFont(QFont(self.font, 11))
+            url_box.addWidget(self.folder_status_label)
+            url_box.setAlignment(Qt.AlignCenter)
+            left_column.addLayout(url_box)
+            
+            
+            content_layout.addLayout(left_column, 2)
+            
+            # Right column for thumbnail and buttons
+            right_column = QVBoxLayout()
+            right_column.setSpacing(6)
+            
+            # Thumbnail preview section
+            thumbnail_label = QLabel("Thumbnail Preview")
+            thumbnail_label.setAlignment(Qt.AlignCenter)
+            thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
+            right_column.addWidget(thumbnail_label)
+            
+            self.thumbnail_preview = QLabel()
+            self.thumbnail_preview.setFixedSize(120, 90)  # Slightly larger thumbnail
+            self.thumbnail_preview.setAlignment(Qt.AlignCenter)
+            self.thumbnail_preview.setStyleSheet("""
+                QLabel {
+                    border: 2px solid #ccc;
+                    border-radius: 5px;
+                    background-color: #f8f8f8;
+                    color: #666;
+                    font-size: 10px;
+                }
+            """)
+            self.thumbnail_preview.setText("No thumbnail\nselected")
+            right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
+            
+            # Add some spacing after thumbnail
+            right_column.addSpacing(6)
+            
+            self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
+            self.choose_thumbnail_button.setMinimumHeight(24)
+            self.choose_thumbnail_button.setFixedWidth(120)
+            self.choose_thumbnail_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    padding: 5px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            self.choose_thumbnail_button.clicked.connect(self.selectThumbnail)
+            right_column.addWidget(self.choose_thumbnail_button, 0, Qt.AlignHCenter)
+            
+            # Add spacing before buttons
+            right_column.addSpacing(12)
+            
+            # Action buttons - positioned to the right
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()  # Push buttons to the right
+            button_layout.setSpacing(8)
+            
+            self.cancel_button = QPushButton("Cancel")
+            self.cancel_button.setMinimumHeight(26)
+            self.cancel_button.setMinimumWidth(75)
+            self.cancel_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            self.cancel_button.clicked.connect(self.reject)
+            button_layout.addWidget(self.cancel_button)
+            
+            self.create_button = QPushButton("Create")
+            self.create_button.setMinimumHeight(26)
+            self.create_button.setMinimumWidth(75)
+            self.create_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 5px 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            self.create_button.clicked.connect(self.createCollection)
+            button_layout.addWidget(self.create_button)
+            
+            right_column.addLayout(button_layout)
+            
+            # Add stretch to push everything to top
+            right_column.addStretch()
+            
+            content_layout.addLayout(right_column, 1)
+
+            self.layout.addLayout(content_layout)
+            
+            # Initialize variables
+            self.selected_folder = ""
+            self.selected_thumbnail = ""
+            self.current_import = 2
+
+    def setupFolderUI(self):
+        if self.current_import != 1:
+            self.resetUI()
+
+            # Main content area with two columns
+            content_layout = QHBoxLayout()
+            content_layout.setSpacing(15)
+            
+            # Left column for form fields
+            left_column = QVBoxLayout()
+            left_column.setSpacing(6)
+            
+            left_column.addLayout(self.import_layout)
+            # Collection name section
+            left_column.addWidget(QLabel("Collection Name:"))
+            self.name_input = QLineEdit()
+            self.name_input.setPlaceholderText("Enter collection name...")
+            self.name_input.setMinimumHeight(24)
+            left_column.addWidget(self.name_input)
+            
+            # Folder section
+            left_column.addWidget(QLabel("Folder:"))
+            folder_layout = QHBoxLayout()
+            folder_layout.setSpacing(6)
+            
+            self.folder_input = QLineEdit()
+            self.folder_input.setPlaceholderText("Select folder containing images...")
+            self.folder_input.setReadOnly(True)
+            self.folder_input.setMinimumHeight(24)
+            folder_layout.addWidget(self.folder_input)
+            
+            self.browse_button = QPushButton("Browse")
+            self.browse_button.setMinimumHeight(24)
+            self.browse_button.setMaximumWidth(65)
+            self.browse_button.clicked.connect(self.selectFolder)
+            folder_layout.addWidget(self.browse_button)
+            
+            left_column.addLayout(folder_layout)
+            
+            # Include subfolders checkbox
+            self.subfolders_checkbox = QCheckBox("Include Subfolders")
+            self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
+
+            self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
+            left_column.addWidget(self.subfolders_checkbox)
+            
+            # Folder status label
+            self.folder_status_label = QLabel("")
+            self.folder_status_label.setWordWrap(True)
+            self.folder_status_label.setMinimumHeight(18)
+            self.folder_status_label.setStyleSheet("font-size: 10px;")
+            left_column.addWidget(self.folder_status_label)
+            
+            content_layout.addLayout(left_column, 2)
+            
+            # Right column for thumbnail and buttons
+            right_column = QVBoxLayout()
+            right_column.setSpacing(6)
+            
+            # Thumbnail preview section
+            thumbnail_label = QLabel("Thumbnail Preview")
+            thumbnail_label.setAlignment(Qt.AlignCenter)
+            thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
+            right_column.addWidget(thumbnail_label)
+            
+            self.thumbnail_preview = QLabel()
+            self.thumbnail_preview.setFixedSize(120, 90)  # Slightly larger thumbnail
+            self.thumbnail_preview.setAlignment(Qt.AlignCenter)
+            self.thumbnail_preview.setStyleSheet("""
+                QLabel {
+                    border: 2px solid #ccc;
+                    border-radius: 5px;
+                    background-color: #f8f8f8;
+                    color: #666;
+                    font-size: 10px;
+                }
+            """)
+            self.thumbnail_preview.setText("No thumbnail\nselected")
+            right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
+            
+            # Add some spacing after thumbnail
+            right_column.addSpacing(6)
+            
+            self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
+            self.choose_thumbnail_button.setMinimumHeight(24)
+            self.choose_thumbnail_button.setFixedWidth(120)
+            self.choose_thumbnail_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    padding: 5px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            self.choose_thumbnail_button.clicked.connect(self.selectThumbnail)
+            right_column.addWidget(self.choose_thumbnail_button, 0, Qt.AlignHCenter)
+            
+            # Add spacing before buttons
+            right_column.addSpacing(12)
+            
+            # Action buttons - positioned to the right
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()  # Push buttons to the right
+            button_layout.setSpacing(8)
+            
+            self.cancel_button = QPushButton("Cancel")
+            self.cancel_button.setMinimumHeight(26)
+            self.cancel_button.setMinimumWidth(75)
+            self.cancel_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            self.cancel_button.clicked.connect(self.reject)
+            button_layout.addWidget(self.cancel_button)
+            
+            self.create_button = QPushButton("Create")
+            self.create_button.setMinimumHeight(26)
+            self.create_button.setMinimumWidth(75)
+            self.create_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 5px 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    font-size: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            self.create_button.clicked.connect(self.createCollection)
+            button_layout.addWidget(self.create_button)
+            
+            right_column.addLayout(button_layout)
+            
+            # Add stretch to push everything to top
+            right_column.addStretch()
+            
+            content_layout.addLayout(right_column, 1)
+
+            self.layout.addLayout(content_layout)
+            
+            # Initialize variables
+            self.selected_folder = ""
+            self.selected_thumbnail = ""
+
+            self.current_import = 1
         
     def selectFolder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Image Folder")
@@ -671,7 +886,6 @@ class CollectionsLandingPage(QMainWindow):
             collection_data['dino'] = False
             collection_data['clip'] = False
             collection_data['image_count'] = image_count
-            # collection_data['id'] = str(uuid4())
             
             # Add to collections
             uuid = str(uuid4())
@@ -683,6 +897,7 @@ class CollectionsLandingPage(QMainWindow):
             
 
     def createColorIndex(self, uuid, collection_data):
+        from accessDBs import add_color
         """Create color index for a collection"""
         class IndexWorker(QThread):
             progress = pyqtSignal(int)

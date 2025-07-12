@@ -1,44 +1,41 @@
-from PIL import Image
-# import chromadb
-# from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
-# from chromadb.utils.data_loaders import ImageLoader
-import numpy as np
-from tqdm import tqdm
-import torch
-import torchvision.transforms.v2 as tfms
-import os
-from imagehash import colorhash
-from vectorDB import VectorDB
-from hashDB import HashDB
-from colors import get_dominant_colors
-import torch
-import faiss
-import json
-import time
-import open_clip
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+# from PIL import Image
+# import numpy as np
+# from tqdm import tqdm
+# import torch
+# import torchvision.transforms.v2 as tfms
+# import os
+# from imagehash import colorhash
+# from vectorDB import VectorDB
+# from hashDB import HashDB
+# from colors import get_dominant_colors
+# import torch
+# import faiss
+# import json
+# import time
+# import open_clip
+# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-transform = tfms.Compose([
-    tfms.Resize(size= (224, 224), interpolation= 1),
-    # tfms.CenterCrop(224),
-    tfms.ToImage(),
-    tfms.ToDtype(torch.float32, scale=True),
-    # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+# transform = tfms.Compose([
+#     tfms.Resize(size= (224, 224), interpolation= 1),
+#     # tfms.CenterCrop(224),
+#     tfms.ToImage(),
+#     tfms.ToDtype(torch.float32, scale=True),
+#     # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+# ])
 
 
-# open_clip.list_pretrained()
-open_clip_model_name = "ViT-B-32"
-open_clip_pretrained_weights = "laion2b_s34b_b79k"
+# # open_clip.list_pretrained()
+# open_clip_model_name = "ViT-B-32"
+# open_clip_pretrained_weights = "laion2b_s34b_b79k"
 
-clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
-    open_clip_model_name,
-    pretrained=open_clip_pretrained_weights,
-    device=device
-)
+# clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
+#     open_clip_model_name,
+#     pretrained=open_clip_pretrained_weights,
+#     device=device
+# )
 
 
 def get_files(folder_path, explore = False):
