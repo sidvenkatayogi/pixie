@@ -328,6 +328,7 @@ class CreateCollectionDialog(QDialog):
             self.folder_status_label.setFont(QFont(self.font, 11))
             url_box.addWidget(self.folder_status_label)
             url_box.setAlignment(Qt.AlignCenter)
+            url_box.setContentsMargins(0, 0, 0, 56)
             left_column.addLayout(url_box)
             
             
