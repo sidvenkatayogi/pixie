@@ -43,7 +43,7 @@ class ImageGalleryApp(QMainWindow):
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
         self.animation_e_timer = QElapsedTimer()
-        self.FPS = 180
+        self.FPS = 60
         # in seconds
         self.animation_time = 0.0
         self.animation_duration = 2000
@@ -100,22 +100,37 @@ class ImageGalleryApp(QMainWindow):
                         
                     # Create context menu
                     menu = QMenu()
-                    open_file = menu.addAction("Open Image")
-                    open_location = menu.addAction("Show in Folder")
+                    query_visual = menu.addAction("Find Visually Similar")
+                    query_color = menu.addAction("Find Colorfully Similar")
                     open_palette = None
                     if c:
                         open_palette = menu.addAction("Show Color Palette")
-                        
+                    open_file = menu.addAction("Open Image")
+                    open_location = menu.addAction("Show in Folder")
                     
                     # Show menu and get selected action
                     action = menu.exec_(event.screenPos())
-                    
-                    if action == open_file:
+                    if action == query_color:
+                        if self.search_type_combo.currentText() != "Color Search":
+                            self.search_type_combo.setCurrentText("Color Search")
+                        if self.color_search_mode.currentText() != "Reference Image":
+                            self.color_search_mode.setCurrentText("Reference Image")
+                        self.color_image_path_label.setText(f"Selected: {path}")
+                        self.query_image_path = path
+                        self.generateGallery()
+                    elif action == open_palette:
+                        preview.exec_()
+                    elif action == query_visual:
+                        if self.search_type_combo.currentText() != "Image Similarity Search (DINO)":
+                            self.search_type_combo.setCurrentText("Image Similarity Search (DINO)")
+                        self.image_path_label.setText(f"Selected: {path}")
+                        self.query_image_path = path
+                        self.generateGallery()
+                    elif action == open_file:
                         self.openImage(path)
                     elif action == open_location:
                         self.showInFolder(path)
-                    elif action == open_palette:
-                        preview.exec_()
+                    
 
     def openImage(self, path):
         """Open image with default system viewer"""
@@ -610,29 +625,7 @@ class ImageGalleryApp(QMainWindow):
     
     def updateImageCountLabel(self, value):
         self.image_count_label.setText(str(value))
-    
-    def clearGallery(self):
-        # Stop animations
-        self.animation_timer.stop()
-        self.zoom_animation_timer.stop()
-        
-        # Stop any active worker threads
-        if hasattr(self, 'index_worker') and self.index_worker:
-            if self.index_worker.isRunning():
-                self.index_worker.terminate()
-                self.index_worker.wait()
 
-        # Clear scene
-        self.scene.clear()
-        self.image_data.clear()
-        
-        # Reset view
-        self.view.resetTransform()
-        self.view.centerOn(0, 0)
-        
-        # Reset animation state
-        self.animation_time = 0.0
-        self.zoom_animating = False
 
     def createIndex(self, index_type):
         """Create similarity search index"""
@@ -740,6 +733,29 @@ class ImageGalleryApp(QMainWindow):
         index = self.search_type_combo.findText(current_search_type)
         if index >= 0:
             self.search_type_combo.setCurrentIndex(index)
+
+    def clearGallery(self):
+        # Stop animations
+        self.animation_timer.stop()
+        self.zoom_animation_timer.stop()
+        
+        # Stop any active worker threads
+        if hasattr(self, 'index_worker') and self.index_worker:
+            if self.index_worker.isRunning():
+                self.index_worker.terminate()
+                self.index_worker.wait()
+
+        # Clear scene
+        self.scene.clear()
+        self.image_data.clear()
+        
+        # Reset view
+        self.view.resetTransform()
+        self.view.centerOn(0, 0)
+        
+        # Reset animation state
+        self.animation_time = 0.0
+        self.zoom_animating = False
 
     def generateGallery(self):
         # Clear existing gallery first
@@ -878,7 +894,6 @@ class ImageGalleryApp(QMainWindow):
 
 
     def start_zoom(self, margin_p=0.1, duration_ms=1000, start_scale=0.1):
-        print("stat")
         bounds = self.calculate_bounds()
         
         margin_x = bounds.width() * margin_p
@@ -916,7 +931,6 @@ class ImageGalleryApp(QMainWindow):
             self.view.fitInView(self.zoom_target_rect, Qt.KeepAspectRatio)
             self.zoom_animation_timer.stop()
             self.zoom_animating = False
-            print("hi")
             return
         
         eased_progress = self.ease_out_pow(t, 6)

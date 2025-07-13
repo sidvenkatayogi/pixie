@@ -3,6 +3,7 @@
 # fix pannning
 # fix off center loading box
 # fix sorting collectoins and it opens the wong colelcton
+# fix color algorithm
 
 import sys
 import os
@@ -764,7 +765,6 @@ class CollectionsLandingPage(QMainWindow):
         
         self.setupUI()
         self.loadCollections()
-        self.showMaximized()
         # self.font = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("Inter.ttc"))[0]
         # print(self.font)
 
@@ -1061,7 +1061,7 @@ def main():
     app.setStyle('Fusion')
 
     window = CollectionsLandingPage()
-    window.show()
+    window.showMaximized()
 
     class ImportThread(QThread):
         finished = pyqtSignal(object)
