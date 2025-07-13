@@ -11,6 +11,7 @@
 
 import sys
 import os
+import re
 import json
 from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -20,6 +21,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 from uuid import uuid4
+from pins import download_board
 print(0)
 
 # Import the gallery app
@@ -146,6 +148,9 @@ class CollectionThumbnail(QFrame):
         menu.setFont(QFont(self.font, 10))
         rename_action = menu.addAction("Rename Collection")
         change_thumb_action = menu.addAction("Change Thumbnail")
+        # TODO update collection
+        delete_action = menu.addAction("Delete Collection")
+        
         
         action = menu.exec_(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
         
@@ -153,8 +158,8 @@ class CollectionThumbnail(QFrame):
             self.renameCollection()
         elif action == change_thumb_action:
             self.changeThumbnail()
-        if action == change_thumb_action:
-            self.changeThumbnail()
+        elif action == delete_action:
+            self.deleteCollection()
 
     def renameCollection(self):
         new_name, ok = QInputDialog.getText(
@@ -183,6 +188,21 @@ class CollectionThumbnail(QFrame):
             self.loadThumbnail()
             self.updateCollectionsFile()
             self.collection_updated.emit()
+
+    def deleteCollection(self):
+        try:
+            with open('collections.json', 'r') as f:
+                collections = json.load(f)
+                
+            del collections[self.uuid]
+                    
+            with open('collections.json', 'w') as f:
+                json.dump(collections, f, indent=2)
+                
+            self.collection_updated.emit()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update collection: {str(e)}")
 
     def updateCollectionsFile(self):
         try:
@@ -251,7 +271,6 @@ class CreateCollectionDialog(QDialog):
 
     def resetUI(self):
         self.clearLayout(self.layout)
-        print("hi")
         self.import_layout = QHBoxLayout()
         self.folder_button = QPushButton("From Folder")
         self.folder_button.clicked.connect(self.setupFolderUI)
@@ -264,7 +283,19 @@ class CreateCollectionDialog(QDialog):
         self.import_layout.addWidget(self.pinterest_button)
 
         self.import_layout.addStretch()
+    
+    def updateUrlStatus(self, text):
+        pattern = r'(https?://)?(www\.)?pinterest\.com/([^/]+)/([^/]+)/?$'
+    
+        match = re.match(pattern, text)
         
+        if match:
+            self.url_status_label.setText(f"✓ Valid Board URL")
+            self.url_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 10px;")
+        else:
+            self.url_status_label.setText("⚠ Invalid Board URL")
+            self.url_status_label.setStyleSheet("color: #ed1111; font-weight: bold; font-size: 10px;")
+    
     def setupPinterestUI(self):
         if self.current_import != 2:
             self.resetUI()
@@ -281,52 +312,24 @@ class CreateCollectionDialog(QDialog):
             url_box = QVBoxLayout()
             # Collection name section
             url_label = QLabel("Public Board URL:")
-            url_label.setFont(QFont(self.font, 11))
+            url_label.setFont(QFont(self.font, 9))
+            url_label.setContentsMargins(3, 0, 0, 0)
             url_box.addWidget(url_label)
             
-            self.name_input = QLineEdit()
-            self.name_input.setFont(QFont(self.font, 11))
-            self.name_input.setPlaceholderText("pinterest.com/user/board")
-            self.name_input.setMinimumHeight(32)
-            url_box.addWidget(self.name_input)
-
-            
-
-            # left_column.addStretch()
-            
-            # # Folder section
-            # left_column.addWidget(QLabel("Folder:"))
-            # folder_layout = QHBoxLayout()
-            # folder_layout.setSpacing(6)
-            
-            # self.folder_input = QLineEdit()
-            # self.folder_input.setPlaceholderText("Select folder containing images...")
-            # self.folder_input.setReadOnly(True)
-            # self.folder_input.setMinimumHeight(24)
-            # folder_layout.addWidget(self.folder_input)
-            
-            # self.browse_button = QPushButton("Browse")
-            # self.browse_button.setMinimumHeight(24)
-            # self.browse_button.setMaximumWidth(65)
-            # self.browse_button.clicked.connect(self.selectFolder)
-            # folder_layout.addWidget(self.browse_button)
-            
-            # left_column.addLayout(folder_layout)
-            
-            # # Include subfolders checkbox
-            # self.subfolders_checkbox = QCheckBox("Include Subfolders")
-            # self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
-
-            # self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
-            # left_column.addWidget(self.subfolders_checkbox)
+            self.url_input = QLineEdit()
+            self.url_input.setFont(QFont(self.font, 9))
+            self.url_input.setPlaceholderText("pinterest.com/user/board")
+            self.url_input.setMinimumHeight(32)
+            self.url_input.textChanged.connect(self.updateUrlStatus)
+            url_box.addWidget(self.url_input)
             
             # # Folder status label
-            self.folder_status_label = QLabel("")
-            self.folder_status_label.setWordWrap(True)
-            self.folder_status_label.setMinimumHeight(18)
-            self.folder_status_label.setStyleSheet("font-size: 10px;")
-            self.folder_status_label.setFont(QFont(self.font, 11))
-            url_box.addWidget(self.folder_status_label)
+            self.url_status_label = QLabel("")
+            self.url_status_label.setWordWrap(True)
+            self.url_status_label.setMinimumHeight(18)
+            # self.url_status_label.setStyleSheet("font-size: 10px;")
+            self.url_status_label.setFont(QFont(self.font, 9))
+            url_box.addWidget(self.url_status_label)
             url_box.setAlignment(Qt.AlignCenter)
             url_box.setContentsMargins(0, 0, 0, 56)
             left_column.addLayout(url_box)
@@ -655,31 +658,101 @@ class CreateCollectionDialog(QDialog):
                 self.thumbnail_preview.setText("")  # Clear placeholder text
                 
     def createCollection(self):
-        name = self.name_input.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Error", "Please enter a collection name.")
-            return
+        self.name = None
+        if self.current_import == 1:
+            self.name = self.name_input.text().strip()
+            if not self.name:
+                QMessageBox.warning(self, "Error", "Please enter a collection name.")
+                return
+                
+            if not self.selected_folder:
+                QMessageBox.warning(self, "Error", "Please select a folder.")
+                return
+                
+            if not os.path.exists(self.selected_folder):
+                QMessageBox.warning(self, "Error", "Selected folder does not exist.")
+                return
             
-        if not self.selected_folder:
-            QMessageBox.warning(self, "Error", "Please select a folder.")
-            return
+            if self.folder_status_label.text()=="⚠ No supported image files found":
+                QMessageBox.warning(self, "Error", "No supported image files found.")
+                return
+
+            self.accept()
+
+        elif self.current_import == 2:
+            if self.url_status_label.text() == "⚠ Invalid Board URL":
+                QMessageBox.warning(self, "Error", "Invalid Board URL.")
+                return
             
-        if not os.path.exists(self.selected_folder):
-            QMessageBox.warning(self, "Error", "Selected folder does not exist.")
-            return
-        
-        if self.folder_status_label.setText("⚠ No supported image files found"):
-            QMessageBox.warning(self, "Error", "No supported image files found.")
+            class IndexWorker(QThread):
+                progress = pyqtSignal(int)
+                finished = pyqtSignal()
+                value_changed = pyqtSignal(int)  # Add signal for progress updates
+                
+                def __init__(self, dialog, url):  # Remove progress_dialog from constructor
+                    super().__init__()
+                    self.url = url
+                    self.dialog = dialog
+                    
+                def run(self):
+                    try:
+                        # Create wrapper class to emit progress signals
+                        # class ProgressEmitter:
+                        #     def __init__(self, signal):
+                        #         self.signal = signal
+                        #     def setValue(self, value):
+                        #         self.signal.emit(value)
+                                
+                        # progress_emitter = ProgressEmitter(self.value_changed)
+                        self.dialog.selected_folder, self.dialog.name = download_board(self.url)
+                        self.finished.emit()
+                    except Exception as e:
+                        print(f"Error in worker thread: {e}")
+
+            def on_cancelled():
+                if self.index_worker:
+                    self.index_worker.terminate()  # Force terminate if needed
+                    self.index_worker.wait()  # Wait for thread to finish
+
+            # Show progress dialog
+            progress_dialog = QProgressDialog(f"Downloading Board: {self.url_input.text().strip()}...", "Cancel", 0, 0, parent=self)
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            # progress_dialog.setWindowFlags(
+            #     progress_dialog.windowFlags() & ~Qt.WindowCloseButtonHint
+            # )
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.canceled.connect(on_cancelled)
+            progress_dialog.show()
             
-        self.accept()
+            # Start worker thread
+            self.index_worker = IndexWorker(self, self.url_input.text().strip())
+
+            def on_finished():
+                progress_dialog.close()
+                if not self.selected_folder:
+                    QMessageBox.warning(self, "Error", "Board not found.\nPlease check for typos or connection issues.")
+                    return
+                
+                self.selected_thumbnail = os.path.join(self.selected_folder, os.listdir(self.selected_folder)[-1])
+                self.accept()
+            # Connect signals
+            # self.index_worker.value_changed.connect(progress_dialog.setValue)
+            self.index_worker.finished.connect(on_finished)
+            self.index_worker.start()
         
     def getCollectionData(self):
-        return  {'name': self.name_input.text().strip(),
+        data = {'name': self.name,
                 'folder': self.selected_folder,
-                'subfolders': self.subfolders_checkbox.isChecked(),
                 'thumbnail_path': self.selected_thumbnail,
                 'last_updated': datetime.now().strftime("%m/%d/%Y"),
                 'created_date': datetime.now().isoformat()}
+
+        try:
+            data['subfolders'] = self.subfolders_checkbox.isChecked()
+        except RuntimeError:
+            data['subfolders'] = False
+        
+        return data
 
 
 class CollectionsLandingPage(QMainWindow):

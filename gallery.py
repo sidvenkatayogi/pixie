@@ -346,12 +346,12 @@ class ImageGalleryApp(QMainWindow):
         image_count_label.setFont(QFont(self.font, 11))
         layout.addWidget(image_count_label)
         self.image_count_slider = QSlider(Qt.Horizontal)
-        self.image_count_slider.setMinimum(2)
+        self.image_count_slider.setMinimum(1)
         self.image_count_slider.setMaximum(self.collection_data["image_count"])
-        self.image_count_slider.setValue(max(2, int(self.collection_data["image_count"] * 0.5)))
+        self.image_count_slider.setValue(max(1, int(self.collection_data["image_count"] * 0.5)))
         self.image_count_slider.valueChanged.connect(self.updateImageCountLabel)
         
-        self.image_count_label = QLabel(str(max(2, int(self.collection_data["image_count"] * 0.5))))
+        self.image_count_label = QLabel(str(max(1, int(self.collection_data["image_count"] * 0.5))))
         self.image_count_label.setFont(QFont(self.font, 11))
         self.image_count_label.setAlignment(Qt.AlignCenter)
         

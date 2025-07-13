@@ -19,8 +19,6 @@ def download_board(url):
     username = match.group(3)
     board_name = match.group(4)
     
-    
-
     try:
         # 1. Initialize PinterestDL with API.
         scraped_images = PinterestDL.with_api().scrape(
@@ -40,12 +38,18 @@ def download_board(url):
         # 3. Download Images
         # Download images to a specified directory
         output_dir = os.path.join("pinterest", username, board_name)
-        #TODO if there is an existing directory make sure to delete it first
+        
+        # Check if directory exists and remove it
+        if os.path.exists(output_dir):
+            import shutil
+            shutil.rmtree(output_dir)
+
         downloaded_imgs = PinterestDL.download_images(images=scraped_images, output_dir=output_dir)
 
-        return output_dir
+        return output_dir, board_name
     except Exception as e:
         print(e)
+        return None, None
 
 if __name__ == "__main__":
-    download_board("pinterest.com/sidvenkatayogii/backgrounds/")
+    download_board("pinterest.com/board/user/")
