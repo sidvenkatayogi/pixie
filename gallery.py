@@ -1,109 +1,26 @@
 import sys
 import os
+import json
 import numpy as np
+from PIL import Image
 import random
 import colorsys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
-                             QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, 
-                             QHBoxLayout, QWidget, QPushButton, QSlider, QLabel,
-                             QLineEdit, QComboBox, QFileDialog, QFrame, QColorDialog,
-                             QButtonGroup, QRadioButton, QGroupBox, QSpacerItem, QDialog,
-                             QSizePolicy, QProgressDialog, QMessageBox, QCheckBox, QMenu)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, 
+                             QGraphicsPixmapItem, QVBoxLayout, QHBoxLayout, QWidget, 
+                             QPushButton, QSlider, QLabel, QLineEdit, QComboBox, QFileDialog, 
+                             QFrame, QColorDialog, QButtonGroup, QRadioButton, QGroupBox, 
+                             QSpacerItem, QDialog, QSizePolicy, QProgressDialog, QMessageBox, 
+                             QCheckBox, QMenu)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
-from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QTimer, pyqtSignal, QSize, QThread
-import time
-import json
+from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QElapsedTimer, QTimer, pyqtSignal, QSize, QThread
+
+from view import CustomGraphicsView
 from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
 from colors import get_dominant_colors, show_palette
-
-import PIL
-from PIL import Image
-
 from colorpicker import colorPicker
 import vcolorpicker
+
 # from PIL.ImageQt import ImageQt # only works for PyQt6
-
-from tqdm import tqdm
-
-class CustomGraphicsView(QGraphicsView):
-    def __init__(self, scene, parent=None):
-        super().__init__(scene, parent)
-
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # smooth rendering and scaling
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setRenderHint(QPainter.SmoothPixmapTransform)
-
-        self.setDragMode(QGraphicsView.NoDrag)
-        # zoom/pan about mouse cursor
-        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        
-        self.panning = False
-        self.last_pos = QPointF()
-
-        self.scene().setSceneRect(-2000*10, -2000*10, 4000*10, 4000*10)
-        self.centerOn(0, 0)
-
-    # start panning
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton: # use left button for panning
-            self.panning = True
-            self.last_pos = event.pos()
-            self.setCursor(Qt.ClosedHandCursor)
-            event.accept()
-        else:
-            super().mousePressEvent(event)
-
-    # track mouse position and pan
-    def mouseMoveEvent(self, event):
-        if self.panning:
-            # calculate the difference in scene coordinates
-            old_scene_pos = self.mapToScene(self.last_pos)
-            new_scene_pos = self.mapToScene(event.pos())
-            delta = old_scene_pos - new_scene_pos
-            
-            # current mouse pos
-            self.last_pos = event.pos()
-            
-            # get current center and adjust it
-            current_center = self.mapToScene(self.viewport().rect().center())
-            new_center = current_center + delta
-            self.centerOn(new_center)
-            event.accept()
-
-    # stop panning when mouse released
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.panning = False
-            self.setCursor(Qt.ArrowCursor)
-            event.accept()
-
-    # zoom with mouse wheel
-    def wheelEvent(self, event):
-        zoom_factor = 1.25
-
-        # get scene position under mouse before zooming
-        mouse_scene_pos = self.mapToScene(event.pos())
-
-        # apply zoom transformation
-        if event.angleDelta().y() > 0: # scroll up (zoom in)
-            self.scale(zoom_factor, zoom_factor)
-        else: # scroll down (zoom out)
-            self.scale(1 / zoom_factor, 1 / zoom_factor)
-        
-        # get scene position under mouse after zooming
-        new_mouse_scene_pos = self.mapToScene(event.pos())
-        
-        # calculate difference and adjust view
-        delta = new_mouse_scene_pos - mouse_scene_pos
-        current_center = self.mapToScene(self.viewport().rect().center())
-        new_center = current_center - delta
-        self.centerOn(new_center)
-        
-        event.accept()
-
 
 class ImageGalleryApp(QMainWindow):
     def __init__(self, uuid, collection_data, font= "Arial"):
@@ -112,7 +29,6 @@ class ImageGalleryApp(QMainWindow):
         self.landing_page = None
         self.uuid = uuid
         self.collection_data = collection_data
-        # self.current_search_mode = "browse"  # browse, color, clip, dino
         self.setWindowTitle("Image Gallery")
         self.setGeometry(100, 100, 1400, 768)
 
@@ -126,19 +42,22 @@ class ImageGalleryApp(QMainWindow):
         
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
+        self.animation_e_timer = QElapsedTimer()
         self.FPS = 180
+        # in seconds
         self.animation_time = 0.0
+        self.animation_duration = 2000
 
         self.zoom_animation_timer = QTimer()
         self.zoom_animation_timer.timeout.connect(self.update_zoom)
+        self.zoom_animation_e_timer = QElapsedTimer()
         
-        self.zoom_start_time = 0
-        self.zoom_duration = 2500
+        self.zoom_duration = self.animation_duration
         self.zoom_start_scale = 0.1
         self.zoom_target_rect = QRectF()
         self.zoom_animating = False
 
-        self.selected_color = QColor(0, 0, 0)  # Default white
+        self.selected_color = QColor(255, 255, 255)  # Default white
 
         self.scene.contextMenuEvent = self.sceneContextMenuEvent
 
@@ -366,16 +285,33 @@ class ImageGalleryApp(QMainWindow):
         size_label.setFont(QFont(self.font, 11))
         size_layout.addWidget(size_label)
 
+        size_layout.addStretch()
+
         self.size_input = QLineEdit()
         self.size_input.setFont(QFont(self.font, 11))
         self.size_input.setText(str(self.STD_SIZE))
         self.size_input.setFixedWidth(70)
         self.size_input.setAlignment(Qt.AlignRight)
-        # self.size_input.textChanged.connect(self.onSizeChanged)
         size_layout.addWidget(self.size_input)
 
         size_layout.addWidget(QLabel("px"))  # Add px label
         layout.addWidget(size_container)
+
+        fps_container = QWidget()
+        fps_layout = QHBoxLayout(fps_container)
+        fps_layout.setContentsMargins(0, 0, 0, 0)
+
+        fps_label = QLabel("Animation FPS:")
+        fps_label.setFont(QFont(self.font, 11))
+        fps_layout.addWidget(fps_label)
+
+        self.fps_input = QLineEdit()
+        self.fps_input.setFont(QFont(self.font, 11))
+        self.fps_input.setText(str(self.FPS))
+        self.fps_input.setFixedWidth(70)
+        self.fps_input.setAlignment(Qt.AlignRight)
+        fps_layout.addWidget(self.fps_input)
+        layout.addWidget(fps_container)
 
         self.loadonce_checkbox = QCheckBox("Load all images at once")
         self.loadonce_checkbox.setFont(QFont(self.font, 11))
@@ -698,19 +634,10 @@ class ImageGalleryApp(QMainWindow):
         self.animation_time = 0.0
         self.zoom_animating = False
 
-    def add_index(self, name, directory, explore, by):
-        if by == "color":
-            add_color(name=name, folder_path=directory, explore=explore)
-        else:
-            add_visual(name=name, folder_path=directory, explore=explore, model= by)
-
     def createIndex(self, index_type):
         """Create similarity search index"""
         if not self.collection_data:
             return
-        
-        # from accessDBs import add_visual
-        # from PyQt5.QtCore import QThread, pyqtSignal
         
 
         class IndexCreationWorker(QThread):
@@ -824,6 +751,7 @@ class ImageGalleryApp(QMainWindow):
         search_type = self.search_type_combo.currentText()
         layout_type = self.layout_buttons.checkedId()
         image_size = self.size_input.text()
+        fps = self.fps_input.text()
         self.loadonce = self.loadonce_checkbox.isChecked()
 
         try:
@@ -836,10 +764,24 @@ class ImageGalleryApp(QMainWindow):
             else:
                 self.STD_SIZE = image_size
         except ValueError:
-            self.STD_SIZE = 512
+            pass
 
         self.STD_SPACE = self.STD_SIZE * 1.4
         self.size_input.setText(str(self.STD_SIZE))
+
+        try:
+            fps = int(fps)
+            # Reasonable size limits
+            if fps > 360:
+                self.FPS = 360
+            elif image_size < 12:
+                self.FPS = 12
+            else:
+                self.FPS = fps
+        except ValueError:
+            pass
+
+        self.fps_input.setText(str(self.FPS))
 
         try:
             # Perform search based on type
@@ -935,7 +877,8 @@ class ImageGalleryApp(QMainWindow):
         return QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
 
 
-    def start_zoom(self, margin_p=0.1, duration_ms=2500, start_scale=0.1):
+    def start_zoom(self, margin_p=0.1, duration_ms=1000, start_scale=0.1):
+        print("stat")
         bounds = self.calculate_bounds()
         
         margin_x = bounds.width() * margin_p
@@ -948,7 +891,6 @@ class ImageGalleryApp(QMainWindow):
             bounds.height() + 2 * margin_y
         )
         
-        self.zoom_duration = duration_ms
         self.zoom_start_scale = start_scale
         self.zoom_elapsed = 0
         self.zoom_animating = True
@@ -960,19 +902,21 @@ class ImageGalleryApp(QMainWindow):
         
         self.view.fitInView(start_rect, Qt.KeepAspectRatio)
         
-        self.zoom_animation_timer.start(int(1000/(self.FPS)))
+        self.zoom_animation_timer.start(int(1000/self.FPS))
+        self.zoom_animation_e_timer.start()
 
     def update_zoom(self):
         if not self.zoom_animating:
             return
-        
-        self.zoom_elapsed += int(1000/(self.FPS))
+        # self.zoom_elapsed += int(1000/self.FPS)/1000
+        self.zoom_elapsed = self.zoom_animation_e_timer.elapsed()
+        self.zoom_elapsed = min(self.zoom_elapsed, self.zoom_duration)
         t = self.zoom_elapsed / self.zoom_duration
-
         if t >= 1:
             self.view.fitInView(self.zoom_target_rect, Qt.KeepAspectRatio)
             self.zoom_animation_timer.stop()
             self.zoom_animating = False
+            print("hi")
             return
         
         eased_progress = self.ease_out_pow(t, 6)
@@ -988,7 +932,7 @@ class ImageGalleryApp(QMainWindow):
         
         self.view.fitInView(current_rect, Qt.KeepAspectRatio)
 
-    def animate_zoom_delayed(self, delay_ms=100, duration_ms=2500):
+    def animate_zoom_delayed(self, delay_ms=100, duration_ms=1000):
         def x():
             if self.loadonce:
                 self.start_zoom(duration_ms=duration_ms)
@@ -1001,18 +945,18 @@ class ImageGalleryApp(QMainWindow):
         return 1 - (1 - t)**3 if t != 1 else 1
 
     def ease_out_exp(self, t):
-        # return 1 - np.exp(-5 * t) if t != 1 else 1 # for floating point
-        return 1 - np.exp(-5 * t) # for floating point
+        return 1 - np.exp(-10 * t) if t != 1 else 1 # for floating point
     
     def ease_out_pow(self, t, pow=2):
-        return -(t-1)**pow + 1
+        return 1-(t-1)**pow
 
     # rotation
     def update_animation(self):
-        self.animation_time += (int(1000/self.FPS) / 1000)
-        
+        # self.animation_time += int(1000/self.FPS)/1000
+        self.animation_time = self.animation_e_timer.elapsed()
+        t = min(self.animation_time/self.animation_duration, 1)
         for item, data in self.image_data.items():
-            # item = data['item']
+            
             r = data['r']
             th_0 = data['th_0']
             w = data['w']
@@ -1027,8 +971,13 @@ class ImageGalleryApp(QMainWindow):
                 # center image on position
                 pixmap = item.pixmap()
                 item.setPos((-pixmap.width() / 2) + new_x, (-pixmap.height() / 2) + -new_y)
-            # self.image_data[item]['w'] *= 0.96 # reverse to initial position
-            self.image_data[item]['w'] *= 0.98 # reverse to initial position
+
+                self.image_data[item]['w'] = data['w_0'] * (1 - self.ease_out_exp(t))
+
+                # self.image_data[item]['w'] *= (1 - min((self.animation_time/self.animation_duration)**25, 1)) # reverse to initial position
+                
+                # self.image_data[item]['w'] *= (-self.ease_out_exp(t) + 1) # reverse to initial position
+            
 
     def generate_dummy_image(self, size, color, text= ""):
         image = QImage(size, size, QImage.Format_ARGB32)
@@ -1070,7 +1019,6 @@ class ImageGalleryApp(QMainWindow):
             progress.show()
 
             pixmaps = []
-            # for image in tqdm(image_info, desc= "Scaling..."):
             for i, image in enumerate(image_info):
                 pixmaps.append(self.imageToQPixmap(image))
                 progress.setValue(i + 1)
@@ -1139,11 +1087,12 @@ class ImageGalleryApp(QMainWindow):
         item.setPos((-pixmap.width() / 2) + x, (-pixmap.height() / 2) + y)
         self.scene.addItem(item)
         
-        base_speed = 1000
-        w = base_speed * direction / (r + 1)
+        v = 600
+        w = v * direction / (r + 1)
         self.image_data[item] = {
             'r': r,
             'th_0': initial_angle,
+            'w_0': w,
             'w': w,
             'path': path,
             'colors': colors
@@ -1192,13 +1141,15 @@ class ImageGalleryApp(QMainWindow):
                 # shuffle if you want expanding rings instead of spiralling rings
                 np.random.shuffle(ths)
 
-        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
-        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=self.zoom_duration)
+        self.animation_timer.start(int(1000/self.FPS))
+        self.animation_e_timer.start()
+        self.animation_time = 0
 
     def getHue(self, image_info):
         if isinstance(image_info, list):
             hueinfo = []
-            for image in tqdm(image_info, desc= "Getting Colors..."):
+            for image in image_info:
                 hueinfo.append(self.getHue(image))
             return hueinfo
         else:
@@ -1302,8 +1253,10 @@ class ImageGalleryApp(QMainWindow):
             # offset = random.randint(0, 359) # alternative offset
             offset = total * 10 # I just the way this offset looks
             ths = np.arange(0 + offset, 360 + offset, step)
-        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
-        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=self.zoom_duration)
+        self.animation_timer.start(int(1000/self.FPS))
+        self.animation_e_timer.start()
+        self.animation_time = 0
 
 
     def hexagons(self, images):
@@ -1317,7 +1270,7 @@ class ImageGalleryApp(QMainWindow):
             images = self.imageToQPixmap(images)
 
         # center image @ (0, 0)
-        self.add_to_scene(x= 0, y= 0, color= colors[0], image= images[0], path=paths[0])
+        self.add_to_scene(x= 0, y= 0, colors= colors[0], image= images[0], path=paths[0])
 
         imgct = 1 # image count
 
@@ -1389,8 +1342,10 @@ class ImageGalleryApp(QMainWindow):
                 
                 QApplication.processEvents()
 
-        self.animate_zoom_delayed(delay_ms=0, duration_ms=2500)
-        self.animation_timer.start(int(1000/self.FPS))  # ~60 FPS (16ms intervals)
+        self.animate_zoom_delayed(delay_ms=0, duration_ms=self.zoom_duration)
+        self.animation_timer.start(int(1000/self.FPS))
+        self.animation_e_timer.start()
+        self.animation_time = 0
 
 
 

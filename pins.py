@@ -24,7 +24,7 @@ def download_board(url):
         scraped_images = PinterestDL.with_api().scrape(
             url=url,  # URL of the Pinterest page
             num=100_000,  # Maximum number of images to scrape
-            delay= 0.2
+            delay= 0.5
             # min_resolution=(512, 512),  # <- Only available to set in the API. Browser mode will have to pruned after download.
         )
 
@@ -52,4 +52,4 @@ def download_board(url):
         return None, None
 
 if __name__ == "__main__":
-    download_board("pinterest.com/board/user/")
+    download_board("https://www.pinterest.com/sidvenkatayogii/graff/")

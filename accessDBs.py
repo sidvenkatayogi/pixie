@@ -51,7 +51,7 @@ def get_files(folder_path, explore = False):
     return image_paths
 
 
-def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", progress=None):
+def add_visual(name, folder_path, explore=False, batch_size=16, model="dino", progress=None):
     image_paths = get_files(folder_path, explore)
     all_embeddings = []
     current_batch_images = []
@@ -63,7 +63,6 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", pr
         current_preprocess = clip_preprocess
     else:
         raise ValueError("Model must be 'dino' or 'clip'")
-
 
     for i, path in enumerate(tqdm(image_paths, desc=f"Creating Embeddings with {model.upper()}...")):
         image = Image.open(path).convert("RGB")
@@ -77,8 +76,12 @@ def add_visual(name, folder_path, explore=False, batch_size=64, model="dino", pr
                     embeddings_batch = dino(batch_tensor)
                 elif model == "clip":
                     embeddings_batch = clip_model.encode_image(batch_tensor)
-                    # embeddings_batch = embeddings_batch / embeddings_batch.norm(p=2, dim=-1, keepdim=True)
-
+            if i == len(image_paths) - 1:
+                time.sleep(0.3) # bro i dont even think this sleep fixes it but the pinterest dl creates threads and then they keep running even after its done downloading
+                # i think thats affecting the adding bc it'll freeze at 100% images
+                # but it works fine if a add print statments???
+                # and the debugger don't work on this so this is all i could think of
+                # im not even sure if the bug is in this section but its my best guess is when moving the tensor to cpu but i lowk have no idea how that works
             all_embeddings.append(embeddings_batch.cpu())
             current_batch_images = []
         if progress:
@@ -123,7 +126,7 @@ def add_color(name, folder_path, explore= False, progress=None):
     for i, path in enumerate(tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB...")):
         try:
             if type(db) == VectorDB:
-                if not db.get_vector(path):
+                if db.get_vector(path) == None:
                     cols = get_dominant_colors(Image.open(path, mode= "r"), num_colors= 3)
                     db.add_vector(id= path,vec= cols)
             elif type(db) == HashDB:

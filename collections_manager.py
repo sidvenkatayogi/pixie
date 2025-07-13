@@ -1,16 +1,12 @@
 # TODO
-# add collection_id so renaming doesn't change files or folders for indexes
 # choose between colorpickers
-# deleting and updating collections and problem of duplicate collections
-# import pinterest
-# fix fast animation
-# progress for color adding
 # fix pannning
-
-
+# fix off center loading box
+# fix sorting collectoins and it opens the wong colelcton
 
 import sys
 import os
+import shutil
 import re
 import json
 from datetime import datetime
@@ -22,11 +18,6 @@ from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 from uuid import uuid4
 from pins import download_board
-print(0)
-
-# Import the gallery app
-# from gallery import ImageGalleryApp
-
 
 class CollectionThumbnail(QFrame):
     """Widget representing a single collection thumbnail"""
@@ -198,7 +189,9 @@ class CollectionThumbnail(QFrame):
                     
             with open('collections.json', 'w') as f:
                 json.dump(collections, f, indent=2)
-                
+            
+            shutil.rmtree(os.path.join("collections", self.uuid))
+
             self.collection_updated.emit()
                 
         except Exception as e:
@@ -771,7 +764,7 @@ class CollectionsLandingPage(QMainWindow):
         
         self.setupUI()
         self.loadCollections()
-
+        self.showMaximized()
         # self.font = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("Inter.ttc"))[0]
         # print(self.font)
 
@@ -807,7 +800,8 @@ class CollectionsLandingPage(QMainWindow):
         header_layout.addWidget(sort_label)
         
         self.sort_combo = QComboBox()
-        self.sort_combo.addItems(["Name", "Date Created", "Date Modified", "Image Count"])
+        self.sort_combo.addItems(["Name", "Date Created", "Image Count"])
+        # self.sort_combo.addItems(["Name", "Date Created", "Date Modified", "Image Count"])
         self.sort_combo.currentTextChanged.connect(self.sortCollections)
         header_layout.addWidget(self.sort_combo)
         
@@ -1053,11 +1047,11 @@ class CollectionsLandingPage(QMainWindow):
         # Store reference to landing page instead of parent
         self.gallery_window.landing_page = self
         
-        self.gallery_window.show()
+        self.gallery_window.showMaximized()
         self.hide()
         
         self.gallery_window.setAttribute(Qt.WA_DeleteOnClose)
-        self.gallery_window.destroyed.connect(self.show)
+        self.gallery_window.destroyed.connect(self.showMaximized)
 
 
 def main():
