@@ -1,8 +1,5 @@
 # TODO
-# choose between colorpickers
 # fix pannning
-# fix off center loading box
-# fix sorting collectoins and it opens the wong colelcton
 # fix color algorithm
 
 import sys
@@ -22,15 +19,18 @@ from pins import download_board
 
 class CollectionThumbnail(QFrame):
     """Widget representing a single collection thumbnail"""
-    clicked = pyqtSignal(dict)
+    clicked = pyqtSignal()
     collection_updated = pyqtSignal()  # New signal for updates
     
     def __init__(self, uuid, collection_data, parent=None, font="Arial"):
-        super().__init__(parent)
+        super().__init__()
+        self.parent = parent
         self.font = font
         self.uuid = uuid
         self.collection_data = collection_data
         self.setupUI()
+        self.clicked.connect(lambda: self.parent.openCollection(self.uuid, self.collection_data))
+        self.collection_updated.connect(self.parent.loadCollections)
         
         
     def setupUI(self):
@@ -122,7 +122,6 @@ class CollectionThumbnail(QFrame):
         # Add info container to main layout
         layout.addWidget(info_container)
         
-        
     def loadThumbnail(self):
         thumbnail_path = self.collection_data.get('thumbnail_path', '')
         if thumbnail_path and os.path.exists(thumbnail_path):
@@ -134,7 +133,7 @@ class CollectionThumbnail(QFrame):
         
         # Create placeholder thumbnail
         self.createPlaceholderThumbnail()
-
+        
     def showMenu(self):
         menu = QMenu(self)
         menu.setFont(QFont(self.font, 10))
@@ -226,7 +225,7 @@ class CollectionThumbnail(QFrame):
     
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.collection_data)
+            self.clicked.emit()
 
 
 class CreateCollectionDialog(QDialog):
@@ -267,12 +266,14 @@ class CreateCollectionDialog(QDialog):
         self.clearLayout(self.layout)
         self.import_layout = QHBoxLayout()
         self.folder_button = QPushButton("From Folder")
+        self.folder_button.setFixedSize(100, 28)
         self.folder_button.clicked.connect(self.setupFolderUI)
         self.folder_button.setContentsMargins(0, 0, 5, 0)
         self.import_layout.addWidget(self.folder_button)
         
 
         self.pinterest_button = QPushButton("From Pinterest")
+        self.pinterest_button.setFixedSize(100, 28)
         self.pinterest_button.clicked.connect(self.setupPinterestUI)
         self.import_layout.addWidget(self.pinterest_button)
 
@@ -681,23 +682,14 @@ class CreateCollectionDialog(QDialog):
             class IndexWorker(QThread):
                 progress = pyqtSignal(int)
                 finished = pyqtSignal()
-                value_changed = pyqtSignal(int)  # Add signal for progress updates
                 
-                def __init__(self, dialog, url):  # Remove progress_dialog from constructor
+                def __init__(self, dialog, url):
                     super().__init__()
                     self.url = url
                     self.dialog = dialog
                     
                 def run(self):
                     try:
-                        # Create wrapper class to emit progress signals
-                        # class ProgressEmitter:
-                        #     def __init__(self, signal):
-                        #         self.signal = signal
-                        #     def setValue(self, value):
-                        #         self.signal.emit(value)
-                                
-                        # progress_emitter = ProgressEmitter(self.value_changed)
                         self.dialog.selected_folder, self.dialog.name = download_board(self.url)
                         self.finished.emit()
                     except Exception as e:
@@ -705,8 +697,8 @@ class CreateCollectionDialog(QDialog):
 
             def on_cancelled():
                 if self.index_worker:
-                    self.index_worker.terminate()  # Force terminate if needed
-                    self.index_worker.wait()  # Wait for thread to finish
+                    self.index_worker.terminate()
+                    self.index_worker.wait()
 
             # Show progress dialog
             progress_dialog = QProgressDialog(f"Downloading Board: {self.url_input.text().strip()}...", "Cancel", 0, 0, parent=self)
@@ -902,9 +894,7 @@ class CollectionsLandingPage(QMainWindow):
                 row = i // cols
                 col = i % cols
                 
-                thumbnail = CollectionThumbnail(uuid, collection, font=self.font)
-                thumbnail.clicked.connect(lambda: self.openCollection(uuid, collection))
-                thumbnail.collection_updated.connect(self.loadCollections)  # Refresh when updated
+                thumbnail = CollectionThumbnail(uuid, collection, parent=self, font=self.font)
                 self.collections_layout.addWidget(thumbnail, row, col)
                 
     def sortCollections(self, sort_by):
@@ -1039,8 +1029,7 @@ class CollectionsLandingPage(QMainWindow):
         
     def openCollection(self, uuid, collection_data):
         # Create gallery window without parent
-        self.gallery_window = ImageGalleryApp(uuid, collection_data)  # Remove parent parameter
-        
+        self.gallery_window = ImageGalleryApp(uuid, collection_data)
         # Set window flags to make it appear in taskbar
         self.gallery_window.setWindowFlags(Qt.Window)
         
@@ -1098,35 +1087,30 @@ def main():
             text-align: center;
         }
     """)
-    
+
     progress.show()
-    # app.processEvents()
 
-    # Create and start import thread
-    import_thread = ImportThread()
-
-
+    screen_geometry = QApplication.primaryScreen().availableGeometry()
+    progress_geometry = progress.frameGeometry()
+    progress_geometry.moveCenter(screen_geometry.center())
+    progress.move(progress_geometry.topLeft())
+    
     def on_import_finished(ImageGalleryApp):
         progress.setLabelText("Done. Welcome to Image Gallery!")
         QTimer.singleShot(750, progress.close)
-        # progress.close()
-        # globals()['ImageGalleryApp'] = ImageGalleryApp
 
     def on_import_error(error_msg):
         progress.close()
         QMessageBox.critical(window, "Error", f"Failed to load models: {error_msg}")
         sys.exit(1)
 
+    import_thread = ImportThread()  
     import_thread.finished.connect(on_import_finished)
     import_thread.error.connect(on_import_error)
     import_thread.start()
-    # global ImageGalleryApp
-    # from gallery import ImageGalleryApp
-    # progress.close()
+
     sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
-    
     main()
-    print("done")
