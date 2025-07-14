@@ -169,7 +169,7 @@ class CollectionThumbnail(QFrame):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select New Thumbnail",
-            "",
+            self.collection_data["folder"],
             "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"
         )
         
