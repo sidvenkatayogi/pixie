@@ -15,6 +15,7 @@ from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
 from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QElapsedTimer, QTimer, pyqtSignal, QSize, QThread
 
 from view import CustomGraphicsView
+from vectorDB import VectorDB
 from accessDBs import add_color, search_color, add_visual, search_visual, search_clip
 from colors import get_dominant_colors, show_palette
 from colorpicker import colorPicker
@@ -29,22 +30,15 @@ class ImageGalleryApp(QMainWindow):
         self.landing_page = None
         self.uuid = uuid
         self.collection_data = collection_data
+        self.color_db = VectorDB.get_DB(self.uuid)
         self.setWindowTitle("Image Gallery")
         self.setGeometry(100, 100, 1400, 768)
 
-        self.scene = QGraphicsScene()
-        self.view = CustomGraphicsView(self.scene)
-        self.loadonce = False
-        self.image_data = {}
-        self.pixmaps = {}
-        self.STD_SIZE = 512
-        self.STD_SPACE = self.STD_SIZE * 1.4
-        
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
         self.animation_e_timer = QElapsedTimer()
         self.FPS = 60
-        # in seconds
+        # in ms
         self.animation_time = 0.0
         self.animation_duration = 2000
 
@@ -56,6 +50,17 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_start_scale = 0.1
         self.zoom_target_rect = QRectF()
         self.zoom_animating = False
+
+        self.scene = QGraphicsScene()
+        self.view = CustomGraphicsView(self.scene)
+        self.view.kinetic_timer.setInterval(int(1000/self.FPS))
+        self.loadonce = False
+        self.image_data = {}
+        self.pixmaps = {}
+        self.STD_SIZE = 512
+        self.STD_SPACE = self.STD_SIZE * 1.4
+        
+        
 
         self.selected_color = QColor(255, 255, 255)  # Default white
 
@@ -73,7 +78,6 @@ class ImageGalleryApp(QMainWindow):
             #     if data_item == item:
                     path = self.image_data[item]["path"]
                     preview = None
-                    # print(self.image_data[item])
                     c = False
                     if isinstance(self.image_data[item].get("colors"), (list, np.ndarray)):
                         c = True
@@ -119,7 +123,8 @@ class ImageGalleryApp(QMainWindow):
                         self.query_image_path = path
                         self.generateGallery()
                     elif action == open_palette:
-                        preview.exec_()
+                        if preview:
+                            preview.exec_()
                     elif action == query_visual:
                         if self.search_type_combo.currentText() != "Image Similarity Search (DINO)":
                             self.search_type_combo.setCurrentText("Image Similarity Search (DINO)")
@@ -705,7 +710,7 @@ class ImageGalleryApp(QMainWindow):
             # search_types.append("Image Content Search (CLIP)")
             
             # Remove CLIP index creation button if it exists
-            if hasattr(self, 'create_clip_btn') and self.create_clip_btn:
+            if 6(self, 'create_clip_btn') and self.create_clip_btn:
                 self.create_clip_btn.setParent(None)
                 self.create_clip_btn.deleteLater()
                 self.create_clip_btn = None
@@ -794,10 +799,14 @@ class ImageGalleryApp(QMainWindow):
                 self.FPS = 12
             else:
                 self.FPS = fps
+
+            self.view.kinetic_timer.setInterval(int(1000/self.FPS))
+            self.view.FPS = self.FPS
         except ValueError:
             pass
 
         self.fps_input.setText(str(self.FPS))
+        
 
         try:
             # Perform search based on type
@@ -873,9 +882,12 @@ class ImageGalleryApp(QMainWindow):
     
     # zoom stuff
     def calculate_bounds(self):
-        
-        min_x = min_y = max_x = max_y = 0
-        
+        if not self.image_data:
+            return QRectF(0, 0, 0, 0)
+
+        min_x = min_y = float('inf')
+        max_x = max_y = float('-inf')
+
         for item in self.image_data.keys():
             rect = item.boundingRect()
             pos = item.pos()
@@ -889,11 +901,34 @@ class ImageGalleryApp(QMainWindow):
             min_y = min(min_y, t)
             max_x = max(max_x, r)
             max_y = max(max_y, b)
-        
-        return QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
 
+        content_width = max_x - min_x
+        content_height = max_y - min_y
 
+        margin_x = content_width * 1
+        margin_y = content_height * 1
+
+        # Create expanded scene rect
+        expanded_rect = QRectF(
+            min_x - margin_x,
+            min_y - margin_y,
+            content_width + 2 * margin_x,
+            content_height + 2 * margin_y
+        )
+
+        self.view.scene().setSceneRect(expanded_rect)
+
+        # Return the original content bounds (not expanded)
+        return QRectF(min_x, min_y, content_width, content_height)
+
+    def ease_out_cubic(self, t):
+        return 1 - (1 - t)**3 if t != 1 else 1
+    def ease_out_exp(self, t):
+        return 1 - np.exp(-10 * t) if t != 1 else 1 # for floating point
+    def ease_out_pow(self, t, pow=2):
+        return 1-(t-1)**pow
     def start_zoom(self, margin_p=0.1, duration_ms=1000, start_scale=0.1):
+        
         bounds = self.calculate_bounds()
         
         margin_x = bounds.width() * margin_p
@@ -954,15 +989,6 @@ class ImageGalleryApp(QMainWindow):
                 return
         
         QTimer.singleShot(delay_ms, x)
-
-    def ease_out_cubic(self, t):
-        return 1 - (1 - t)**3 if t != 1 else 1
-
-    def ease_out_exp(self, t):
-        return 1 - np.exp(-10 * t) if t != 1 else 1 # for floating point
-    
-    def ease_out_pow(self, t, pow=2):
-        return 1-(t-1)**pow
 
     # rotation
     def update_animation(self):
@@ -1121,6 +1147,10 @@ class ImageGalleryApp(QMainWindow):
             paths.append(image.get("path"))
             colors.append(image.get("colors"))
 
+        for i in range(len(colors)):
+            if np.all(colors[i] != None):
+                colors[i] = colors[i].reshape(int(len(colors[i])/4), 4)
+
         if self.loadonce:
             images = self.imageToQPixmap(images)
 
@@ -1169,13 +1199,22 @@ class ImageGalleryApp(QMainWindow):
         else:
             image = image_info
 
+
+
+
             l = []
             if "colors" in image:
                 l = image["colors"]
+                
             else:
-                l = get_dominant_colors(Image.open(image["path"]).convert('RGB'))
+                if np.all(self.color_db.get_vector(image["path"]) != None):
+                    l = self.color_db.get_vector(image["path"])
+                else:
+                    l = get_dominant_colors(Image.open(image["path"]).convert('RGB'))
+                image["colors"] = l
 
             l = l.reshape(int(len(l)/4), 4)
+            
             tx = 0
             ty = 0
             tf = 0
@@ -1196,7 +1235,6 @@ class ImageGalleryApp(QMainWindow):
         colors = []
         for image in images:
             paths.append(image.get("path"))
-            colors.append(image.get("colors"))
 
         hueinfo = []
 
@@ -1279,6 +1317,10 @@ class ImageGalleryApp(QMainWindow):
         for image in images:
             paths.append(image.get("path"))
             colors.append(image.get("colors"))
+
+        for i in range(len(colors)):
+            if np.all(colors[i] != None):
+                colors[i] = colors[i].reshape(int(len(colors[i])/4), 4)
 
         if self.loadonce:
             images = self.imageToQPixmap(images)

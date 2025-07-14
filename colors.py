@@ -123,7 +123,7 @@ def show_palette(cols):
     # img = Image.open(path)
     bars = []
     # cols = get_dominant_colors(img, num_colors= 5)
-    for color in cols.reshape(int(len(cols)/4), 4):
+    for color in cols:
         bar, rgb = create_bar(200, 200, color)
         bars.append(bar)
 

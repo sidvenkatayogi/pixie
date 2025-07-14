@@ -1,5 +1,4 @@
 # TODO
-# fix pannning
 # fix color algorithm
 
 import sys

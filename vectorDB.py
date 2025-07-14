@@ -54,7 +54,10 @@ class VectorDB:
 
 
     def get_vector(self, id):
-        return np.asarray(self.vector_data.get(id))
+        if np.any(self.vector_data.get(id) != None):
+            return np.asarray(self.vector_data.get(id))
+        else:
+            return None
 
     def update_index(self, id, vec):
         """
