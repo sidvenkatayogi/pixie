@@ -6,9 +6,10 @@ from collections import deque
 import numpy as np
 
 class CustomGraphicsView(QGraphicsView):
-    def __init__(self, scene, fps=60):
+    def __init__(self, scene, parent_window, fps=60):
         super().__init__(scene)
-
+        self.parent_window = parent_window
+        
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
@@ -35,13 +36,17 @@ class CustomGraphicsView(QGraphicsView):
         self.last_time = 0
         
         self.friction = 0.95
-        self.min_velocity = 0.5  # stop kinetic panning below this velocity
+        self.min_velocity = 1  # stop kinetic panning below this velocity
         self.velocity_scale = 0.3
 
         self.centerOn(0, 0)
 
     # start panning
     def mousePressEvent(self, event):
+        if hasattr(self.parent_window, 'zoom_animating') and self.parent_window.zoom_animating:
+            self.parent_window.zoom_animation_timer.stop()
+            self.parent_window.zoom_animating = False
+
         if event.button() == Qt.LeftButton: # use left button for panning
             # stop any ongoing kinetic panning
             self.kinetic_timer.stop()
@@ -131,7 +136,7 @@ class CustomGraphicsView(QGraphicsView):
 
     def update_kinetic_pan(self):
         self.velocity *= self.friction
-        
+        # print(self.velocity)
         # stop if velocity is too small
         if np.sqrt(self.velocity.x()**2 + self.velocity.y()**2) < self.min_velocity:
             self.kinetic_timer.stop()
@@ -149,7 +154,11 @@ class CustomGraphicsView(QGraphicsView):
         # stop kinetic panning when zooming
         # self.kinetic_timer.stop()
         # self.velocity = QPointF(0, 0)
-        
+        if hasattr(self.parent_window, 'zoom_animating') and self.parent_window.zoom_animating:
+            self.parent_window.zoom_animation_timer.stop()
+            self.parent_window.zoom_animating = False
+
+
         zoom_factor = 1.25
 
         mouse_scene_pos = self.mapToScene(event.pos())

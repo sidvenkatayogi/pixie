@@ -52,8 +52,8 @@ class ImageGalleryApp(QMainWindow):
         self.zoom_animating = False
 
         self.scene = QGraphicsScene()
-        self.view = CustomGraphicsView(self.scene)
-        self.view.kinetic_timer.setInterval(int(1000/self.FPS))
+        self.view = CustomGraphicsView(self.scene, self)
+        # self.view.kinetic_timer.setInterval(int(1000/self.FPS))
         self.loadonce = False
         self.image_data = {}
         self.pixmaps = {}
@@ -710,7 +710,7 @@ class ImageGalleryApp(QMainWindow):
             # search_types.append("Image Content Search (CLIP)")
             
             # Remove CLIP index creation button if it exists
-            if 6(self, 'create_clip_btn') and self.create_clip_btn:
+            if (self, 'create_clip_btn') and self.create_clip_btn:
                 self.create_clip_btn.setParent(None)
                 self.create_clip_btn.deleteLater()
                 self.create_clip_btn = None
@@ -800,8 +800,8 @@ class ImageGalleryApp(QMainWindow):
             else:
                 self.FPS = fps
 
-            self.view.kinetic_timer.setInterval(int(1000/self.FPS))
-            self.view.FPS = self.FPS
+            # self.view.kinetic_timer.setInterval(int(1000/self.FPS))
+            # self.view.FPS = self.FPS
         except ValueError:
             pass
 
@@ -1080,7 +1080,7 @@ class ImageGalleryApp(QMainWindow):
                 if max(h, w) == h:
                     image = image.resize((int(self.STD_SIZE * ar), self.STD_SIZE))
                 else:
-                    image = image.resize((self.STD_SIZE, int(self.STD_SIZE / ar)))
+                    image = image.resize((self.STD_SIZE, int(self.STD_SIZE / (ar+1))))
 
                 w, h = image.size
 
@@ -1097,7 +1097,8 @@ class ImageGalleryApp(QMainWindow):
                         # self.pixmaps[image.get("path")] = pixmap
                 h = pixmap.height()
                 w = pixmap.width()
-
+                if w == 0 and h == 0:
+                    QMessageBox.critical(self, "Error", f"Images not found. Please recreate the collection or revert the names of any relevant folders.")
                 ar = w/h
                 if max(h, w) == h:
                     pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,

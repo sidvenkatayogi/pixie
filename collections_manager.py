@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
                              QFrame, QScrollArea, QDialog, QLineEdit, QProgressDialog,
                              QFileDialog, QCheckBox, QMessageBox, QComboBox, QMenu, QInputDialog, QMessageBox)
-from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor
+from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor, QIcon
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 from uuid import uuid4
 from pins import download_board
@@ -265,18 +265,22 @@ class CreateCollectionDialog(QDialog):
         self.clearLayout(self.layout)
         self.import_layout = QHBoxLayout()
         self.folder_button = QPushButton("From Folder")
-        self.folder_button.setFixedSize(100, 28)
+        # self.folder_button.setFixedSize(85, 40)
         self.folder_button.clicked.connect(self.setupFolderUI)
-        self.folder_button.setContentsMargins(0, 0, 5, 0)
+        # self.folder_button.setContentsMargins(0, 0, 5, 0)
         self.import_layout.addWidget(self.folder_button)
         
 
-        self.pinterest_button = QPushButton("From Pinterest")
-        self.pinterest_button.setFixedSize(100, 28)
+        self.pinterest_button = QPushButton("From Pinterest ")
+        # self.pinterest_button.setFixedSize(85, 40)
         self.pinterest_button.clicked.connect(self.setupPinterestUI)
+        pinterest_icon = QIcon(os.path.join("assets","Pinterest-logo.png"))
+        self.pinterest_button.setIcon(pinterest_icon)
+        self.pinterest_button.setIconSize(QSize(14, 14))
+        self.pinterest_button.setLayoutDirection(Qt.RightToLeft)
         self.import_layout.addWidget(self.pinterest_button)
 
-        self.import_layout.addStretch()
+        # self.import_layout.addStretch()
     
     def updateUrlStatus(self, text):
         pattern = r'(https?://)?(www\.)?pinterest\.com/([^/]+)/([^/]+)/?$'
@@ -729,7 +733,7 @@ class CreateCollectionDialog(QDialog):
         data = {'name': self.name,
                 'folder': self.selected_folder,
                 'thumbnail_path': self.selected_thumbnail,
-                'last_updated': datetime.now().strftime("%m/%d/%Y"),
+                'last_updated': datetime.now().isoformat(),
                 'created_date': datetime.now().isoformat()}
 
         try:
@@ -756,11 +760,9 @@ class CollectionsLandingPage(QMainWindow):
         
         self.setupUI()
         self.loadCollections()
-        # self.font = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont("Inter.ttc"))[0]
-        # print(self.font)
 
     def loadCustomFont(self):
-        font_id = QFontDatabase.addApplicationFont("Inter.ttc")
+        font_id = QFontDatabase.addApplicationFont(os.path.join("assets","Inter.ttc"))
         if font_id != -1:
             self.font = QFontDatabase.applicationFontFamilies(font_id)[0]
         else:
