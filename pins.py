@@ -4,8 +4,17 @@ import re
 from pinterest_dl import PinterestDL
 
 def download_board(url):
+    """
+    Downloads a public pinterest board
+
+    Args:
+        url (str): url of th epublic pinterest board
+
+    Returns:
+        str: output directory,
+        str: name of board
+    """
     pattern = r'(https?://)?(www\.)?pinterest\.com/([^/]+)/([^/]+)/?$'
-    
     match = re.match(pattern, url)
     if not match:
         print("Invalid Pinterest URL. Must be in format: pinterest.com/username/boardname")
@@ -33,7 +42,8 @@ def download_board(url):
         # images_data = [img.to_dict() for img in scraped_images]
         # with open("art.json", "w") as f:
         #     json.dump(images_data, f, indent=4)
-        #TODO use alt text instead of embedding every image with clip
+        #
+        # in the future, you could use/add alt text instead of embedding every image with clip
 
         # 3. Download Images
         # Download images to a specified directory
@@ -52,4 +62,4 @@ def download_board(url):
         return None, None
 
 if __name__ == "__main__":
-    download_board("https://www.pinterest.com/sidvenkatayogii/graff/")
+    pass

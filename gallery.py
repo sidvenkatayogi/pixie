@@ -1200,9 +1200,6 @@ class ImageGalleryApp(QMainWindow):
         else:
             image = image_info
 
-
-
-
             l = []
             if "colors" in image:
                 l = image["colors"]

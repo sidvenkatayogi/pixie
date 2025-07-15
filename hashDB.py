@@ -1,8 +1,11 @@
-# TODO refactor this to use a database parent class and hashdb and vectordb to be children of that class
+"""I made this class for image hashing by color but I endeed up making my own way of comparing images by color
+it uses the imagehash library and clusters images into a hash
+i don't really get how the clustering worked though so i didn't use it and just used a vector approach
+utilizing this in the future, maybe combiend with vectors, could be a significant performance improvement"""
+
 import numpy as np
 import colors
 import imagehash
-import time
 
 class HashDB:
     def __init__(self):

@@ -19,7 +19,7 @@ def get_dominant_colors(image, palette_size=16, num_colors=5):
     # resize image to speed up processing
     if image.mode != 'RGB':
         image = image.convert('RGB')
-    img = image.resize((64, 64), resample= 0)
+    img = image.resize((128, 128), resample= 0)
     
     # reduce colors (uses k-means internally)
     paletted = img.convert('P', palette=Image.ADAPTIVE, colors= palette_size)

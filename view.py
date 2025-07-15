@@ -95,9 +95,6 @@ class CustomGraphicsView(QGraphicsView):
             
             self.calculate_velocity()
             
-            # start kinetic panning if velocity is significant
-            # if (abs(self.velocity.x()) > self.min_velocity or 
-            #     abs(self.velocity.y()) > self.min_velocity):
             if np.sqrt(self.velocity.x()**2 + self.velocity.y()**2) > self.min_velocity:
                 self.kinetic_timer.start()
             
@@ -151,13 +148,9 @@ class CustomGraphicsView(QGraphicsView):
 
     # zoom with mouse wheel
     def wheelEvent(self, event):
-        # stop kinetic panning when zooming
-        # self.kinetic_timer.stop()
-        # self.velocity = QPointF(0, 0)
         if hasattr(self.parent_window, 'zoom_animating') and self.parent_window.zoom_animating:
             self.parent_window.zoom_animation_timer.stop()
             self.parent_window.zoom_animating = False
-
 
         zoom_factor = 1.25
 

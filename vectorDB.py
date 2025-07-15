@@ -135,7 +135,6 @@ class VectorDB:
         Returns:
             Vector_DB or None if not found
         """
-        
         if not os.path.exists(os.path.join("collections", name, f"{name}.json")):
             return None
         

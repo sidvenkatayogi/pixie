@@ -146,9 +146,8 @@ def add_color(name, folder_path, explore= False, progress=None):
     image_paths = get_files(folder_path, explore)
 
     db = None
-    try:
-        db = VectorDB.get_DB(name= name)
-    except Exception as e:
+    db = VectorDB.get_DB(name= name)
+    if not db:
         db = VectorDB(name= name)
 
     for i, path in enumerate(tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB...")):

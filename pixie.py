@@ -1110,7 +1110,6 @@ def main():
             except Exception as e:
                 self.error.emit(str(e))
 
-
     progress = QProgressDialog("Loading models...", None, 0, 0, parent=window)
     progress.setWindowTitle("Loading")
     progress.setWindowModality(Qt.WindowModal)
