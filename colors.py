@@ -6,11 +6,13 @@ from skimage.color import rgb2lab
 
 def get_dominant_colors(image, palette_size=16, num_colors=5):
     # Resize image to speed up processing
-    if image.width >= 512 and image.height >= 512:
-        img = image.resize((int(image.width/100), int(image.height/100)), resample= 0)
-    else:
-        img = image
-
+    # if image.width >= 512 and image.height >= 512:
+    #     img = image.resize((int(image.width/100), int(image.height/100)), resample= 0)
+    # else:
+    #     img = image
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    img = image.resize((64, 64), resample= 0)
     # Reduce colors (uses k-means internally)
     paletted = img.convert('P', palette=Image.ADAPTIVE, colors= palette_size)
 

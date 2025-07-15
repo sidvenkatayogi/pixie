@@ -31,7 +31,7 @@ class ImageGalleryApp(QMainWindow):
         self.uuid = uuid
         self.collection_data = collection_data
         self.color_db = VectorDB.get_DB(self.uuid)
-        self.setWindowTitle("Collection View - Pixie")
+        self.setWindowTitle(f"Mosaic View - {collection_data["name"]}")
         self.setGeometry(100, 100, 1400, 768)
 
         self.animation_timer = QTimer()
@@ -58,7 +58,7 @@ class ImageGalleryApp(QMainWindow):
         self.image_data = {}
         self.pixmaps = {}
         self.STD_SIZE = 512
-        self.STD_SPACE = self.STD_SIZE * 1.4
+        self.STD_SPACE = self.STD_SIZE * 1.5
         
         
 
@@ -85,7 +85,7 @@ class ImageGalleryApp(QMainWindow):
                         image = show_palette(colors)
                         
                         # Create color palette preview dialog
-                        preview = QDialog(self)
+                        preview = QDialog()
                         preview.setWindowTitle("Color Palette")
                         preview.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
                         preview_layout = QVBoxLayout(preview)
@@ -251,7 +251,7 @@ class ImageGalleryApp(QMainWindow):
         home_button_layout.addWidget(self.home_button)
         layout.addLayout(home_button_layout)
 
-        title = QLabel("Gallery Controls")
+        title = QLabel("Mosaic Controls")
         title.setFont(QFont(self.font, 16, QFont.Bold))
         title.setStyleSheet("margin: 10px;")
         title.setAlignment(Qt.AlignCenter)
@@ -398,7 +398,7 @@ class ImageGalleryApp(QMainWindow):
 
         
         # Generate button
-        self.generate_button = QPushButton("Generate Gallery")
+        self.generate_button = QPushButton("Generate Mosaic")
         self.generate_button.setFont(QFont(self.font, 14))
         self.generate_button.setStyleSheet("""
             QPushButton {
@@ -421,7 +421,7 @@ class ImageGalleryApp(QMainWindow):
         layout.addWidget(self.generate_button)
         
         # Clear button
-        self.clear_button = QPushButton("Clear Gallery")
+        self.clear_button = QPushButton("Clear Mosaic")
         self.clear_button.setFont(QFont(self.font, 14))
         self.clear_button.setStyleSheet("""
             QPushButton {
@@ -787,7 +787,7 @@ class ImageGalleryApp(QMainWindow):
         except ValueError:
             pass
 
-        self.STD_SPACE = self.STD_SIZE * 1.4
+        self.STD_SPACE = self.STD_SIZE * 1.5
         self.size_input.setText(str(self.STD_SIZE))
 
         try:

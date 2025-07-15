@@ -9,32 +9,32 @@ from colors import get_dominant_colors
 import faiss
 import json
 import time
-# import torch
-# import torchvision.transforms.v2 as tfms
-# import open_clip
-# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+import torch
+import torchvision.transforms.v2 as tfms
+import open_clip
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-# dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
-# device = 'cuda' if torch.cuda.is_available() else 'cpu'
+dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# transform = tfms.Compose([
-#     tfms.Resize(size= (224, 224), interpolation= 1),
-#     # tfms.CenterCrop(224),
-#     tfms.ToImage(),
-#     tfms.ToDtype(torch.float32, scale=True),
-#     # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-# ])
+transform = tfms.Compose([
+    tfms.Resize(size= (224, 224), interpolation= 1),
+    # tfms.CenterCrop(224),
+    tfms.ToImage(),
+    tfms.ToDtype(torch.float32, scale=True),
+    # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
 
-# # open_clip.list_pretrained()
-# open_clip_model_name = "ViT-B-32"
-# open_clip_pretrained_weights = "laion2b_s34b_b79k"
+# open_clip.list_pretrained()
+open_clip_model_name = "ViT-B-32"
+open_clip_pretrained_weights = "laion2b_s34b_b79k"
 
-# clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
-#     open_clip_model_name,
-#     pretrained=open_clip_pretrained_weights,
-#     device=device
-# )
+clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
+    open_clip_model_name,
+    pretrained=open_clip_pretrained_weights,
+    device=device
+)
 
 
 def get_files(folder_path, explore = False):
@@ -50,7 +50,7 @@ def get_files(folder_path, explore = False):
     return image_paths
 
 
-def add_visual(name, folder_path, explore=False, batch_size=16, model="dino", progress=None):
+def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", progress=None):
     image_paths = get_files(folder_path, explore)
     all_embeddings = []
     current_batch_images = []
@@ -126,7 +126,7 @@ def add_color(name, folder_path, explore= False, progress=None):
         try:
             if type(db) == VectorDB:
                 if db.get_vector(path) == None:
-                    cols = get_dominant_colors(Image.open(path, mode= "r"), num_colors= 3)
+                    cols = get_dominant_colors(Image.open(path, mode= "r"), num_colors= 4)
                     db.add_vector(id= path,vec= cols)
             elif type(db) == HashDB:
                 hash = colorhash(Image.open(path), binbits = 7)

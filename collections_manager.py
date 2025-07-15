@@ -73,7 +73,6 @@ class CollectionThumbnail(QFrame):
         info_layout = QVBoxLayout(info_container)
         info_layout.setContentsMargins(0, 5, 0, 0)  # Added top margin
         info_layout.setSpacing(0)
-
         # Collection name
         name_label = QLabel(self.collection_data.get('name', 'Untitled'))
         name_label.setFont(QFont(self.font, 12, QFont.Bold))
@@ -88,8 +87,10 @@ class CollectionThumbnail(QFrame):
 
         # Collection info
         image_count = self.collection_data.get('image_count', 0)
-        date_updated = self.collection_data.get('last_updated', '')
-        info_label = QLabel(f"{image_count} Images\n{date_updated}")
+        created_date = datetime.fromisoformat(self.collection_data.get('created_date', '')).strftime("%m/%d/%Y")
+        info_label = QLabel(f"{image_count} Images\n{created_date}")
+        # date_updated = self.collection_data.get('last_updated', '')
+        # info_label = QLabel(f"{image_count} Images\n{date_updated}")
         info_label.setFont(QFont(self.font, 9))
         info_label.setAlignment(Qt.AlignLeft)
         info_label.setStyleSheet("color: #666; border: none; background: transparent;")
@@ -696,6 +697,9 @@ class CreateCollectionDialog(QDialog):
             if self.folder_status_label.text()=="⚠ No supported image files found":
                 QMessageBox.warning(self, "Error", "No supported image files found.")
                 return
+            
+            if not self.selected_thumbnail:
+                self.selected_thumbnail = os.path.join(self.selected_folder, os.listdir(self.selected_folder)[-1])
 
             self.accept()
 
@@ -842,7 +846,7 @@ class CollectionsLandingPage(QMainWindow):
         self.empty_label = QLabel("You have no collections saved. Create a new one with the + in the bottom right!")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setFont(QFont(self.font, 14))
-        self.empty_label.setStyleSheet("color: #666; margin: 50px; padding-bottom: 65px")
+        self.empty_label.setStyleSheet("color: #55516e; margin: 50px; padding-bottom: 65px")
         self.empty_label.hide()
         main_layout.addWidget(self.empty_label)
         
