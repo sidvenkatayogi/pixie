@@ -12,21 +12,18 @@ import time
 import torch
 import torchvision.transforms.v2 as tfms
 import open_clip
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" # quick fix for a faiss bug
 
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 transform = tfms.Compose([
     tfms.Resize(size= (224, 224), interpolation= 1),
-    # tfms.CenterCrop(224),
     tfms.ToImage(),
     tfms.ToDtype(torch.float32, scale=True),
     # tfms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-
-# open_clip.list_pretrained()
 open_clip_model_name = "ViT-B-32"
 open_clip_pretrained_weights = "laion2b_s34b_b79k"
 
@@ -38,6 +35,16 @@ clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transfo
 
 
 def get_files(folder_path, explore = False):
+    """
+    Get all the image file paths within a folder
+
+    Args:
+        folder_path (str): folder of images
+        explore (bool, optional): True if including subfolders, default False
+
+    Returns:
+        list[str]
+    """
     image_paths = []
     for file in tqdm(os.listdir(folder_path), desc= f"Exploring... ({folder_path})", disable= not explore):
         # print(folder_path)
@@ -51,6 +58,17 @@ def get_files(folder_path, explore = False):
 
 
 def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", progress=None):
+    """
+    Add images from a folder to a FAISS index using an image embedding model
+
+    Args:
+        name (str): name for the index
+        folder_path (str): folder of images
+        explore (bool, optional): True if including subfolders, default False
+        batch_size (int, optional): batch size for embedding
+        model (str, optional): embedding model to use (must be either "dino" or "clip"). default "dino"
+        progress (QProgressDialog, optional): proress dialog to update while adding images, default None
+    """
     image_paths = get_files(folder_path, explore)
     all_embeddings = []
     current_batch_images = []
@@ -67,7 +85,8 @@ def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", pr
         image = Image.open(path).convert("RGB")
         transformed_image = current_preprocess(image)
         current_batch_images.append(transformed_image)
-
+        
+        # batching
         if len(current_batch_images) == batch_size or i == len(image_paths) - 1:
             batch_tensor = torch.stack(current_batch_images).to(device)
             with torch.no_grad():
@@ -93,6 +112,8 @@ def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", pr
 
     d = len(vectors[0])
     index = None
+
+    # use inner product for dino and euclidean for clip
     if model == "dino":
         index = faiss.IndexFlatIP(d)
     elif model == "clip":
@@ -100,19 +121,27 @@ def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", pr
 
     index = faiss.IndexIDMap(index)
 
+    # numeric ids (maps to paths)
     ids = np.array(range(len(image_paths)))
     index.add_with_ids(vectors, ids)
 
-    # os.makedirs("database", exist_ok=True)
+    # save paths to a json file to map to embeddings with numeric ids
     faiss.write_index(index, os.path.join("collections", name, f"{name}_{model}.index"))
     with open(os.path.join("collections", name, f"{name}_{model}_paths.json"), "w") as f:
         json.dump(image_paths, f)
 
-    print(f"FAISS index and paths saved for {name} using {model.upper()} model.")
-
 
 
 def add_color(name, folder_path, explore= False, progress=None):
+    """
+    Add images from a folder to a Vector_DB using a color index and save to JSON
+
+    Args:
+        name (str): name for the Vector_DB
+        folder_path (str): folder of images
+        explore (bool, optional): True if including subfolders, default False
+        progress (QProgressDialog, optional): proress dialog to update while adding images, default None
+    """
     image_paths = []
     image_paths = get_files(folder_path, explore)
 
@@ -136,14 +165,25 @@ def add_color(name, folder_path, explore= False, progress=None):
         if progress:
             progress.setValue(i + 1)
             
-    db.save_DB(folder_name= name)
+    db.save_DB()
 
 
-def search_visual(name, file_path, k = -1):
-    start_time = time.time()
+def search_visual(name, file_path, k = 5):
+    """
+    Get the k nearest neighbors of a dino index using a query image
+
+    Args:
+        name (str): name of index to search
+        file_path (str): path of image to embed into DINO and query
+        k (int, optional): number of nearest neighbors to return, default 5
+
+
+    Returns:
+            list[dict]: sorted by distance list of k nearest neighbors represented by a dictionary with keys:
+                "path" (Any): the respective image path to the image embedding
+                "distance" (float): distance to the query
+    """
     index = faiss.read_index(os.path.join("collections", name, f"{name}_dino.index"))
-    end_time = time.time()
-    print(f"Loading time: {end_time - start_time:.3f} seconds")
 
     if k == -1:
         k = index.ntotal
@@ -151,20 +191,15 @@ def search_visual(name, file_path, k = -1):
     query_image = Image.open(file_path).convert("RGB").resize((224, 224))
     query_tensor = transform(query_image).unsqueeze(0).to(device)
     
-    start_time = time.time()
     with torch.no_grad():
         query_embedding = dino(query_tensor).cpu().numpy()
         faiss.normalize_L2(query_embedding)
-    end_time = time.time()
-    print(f"embeddding time: {end_time - start_time:.3f} seconds")
     
-    start_time = time.time()
     distances, indices = index.search(query_embedding, k)
-    end_time = time.time()
-    print(f"search time: {end_time - start_time:.3f} seconds")
     indices = indices[0]
     distances = distances[0]
-    # Load the original image paths to map back to filenames
+
+    # load the original image paths to map back to embeddings
     with open(os.path.join("collections", name, f"{name}_dino_paths.json"), "r") as f:
         image_paths = json.load(f)
         
@@ -173,13 +208,26 @@ def search_visual(name, file_path, k = -1):
         if indices[i] < len(image_paths):
             results.append({"path": image_paths[indices[i]], "distance": distances[i]})
 
-    # not actually distance its similarity
+    # not actually distance its similarity so reverse
     results.sort(key= lambda x: x["distance"], reverse= True)
 
     return [{"path": file_path, "distance": 0}] + results
 
 
-def search_clip(name, query : str, k = -1):
+def search_clip(name, query : str, k = 5):
+    """
+    Get the k nearest neighbors of a dino index using a query text
+
+    Args:
+        name (str): name of index to search
+        query (str): text to embed into CLIP and query
+        k (int, optional): number of nearest neighbors to return, default 5
+
+    Returns:
+            list[dict]: sorted by distance list of k nearest neighbors represented by a dictionary with keys:
+                "path" (Any): the respective image path to the image embedding
+                "distance" (float): distance to the query
+    """
     start_time = time.time()
 
     index = faiss.read_index(os.path.join("collections", name, f"{name}_clip.index"))
@@ -220,24 +268,37 @@ def search_clip(name, query : str, k = -1):
 
 
 def search_color(name, rgb= None, path= None, k = 5):
+    """
+    Get the k nearest neighbors of a color index using either rgb values or query image
+
+    Args:
+        name (str): name of index to search
+        rgb (tuple, optional): if querying by color, tuple of RGB values in the form (R, G, B). default None (then must input path)
+        path (str, optional): if querying by image, path of image to query. default None (then must input rgb)
+        k (int, optional): number of nearest neighbors to return, default 5
+
+    Returns:
+            list[dict]: sorted by distance list of k nearest neighbors represented by a dictionary with keys:
+                "path" (str): the respective image path to the color vector. the first dict in the list is the query, and if an RGB query was used, "path" is replaced with
+                "image" (PIL.Image): solid color image of query color. only present if element is the first in the list and query was rgb
+                "distance" (float): distance to the query
+                "colors" (numpy.ndarray): the color vector of an image which has the following structure:\n
+                [red (of most dominant color), blue, green, frequency, red (of 2nd most dominant color), blue, green, frequency, ...]
+    """
     query_image = None
-    # query_pixmap = None
 
     if rgb and len(rgb) == 3:
         query_image = Image.new('RGB', (10, 10), rgb)
-        # query_pixmap = imageToQPixmap(query_image)
     elif path:
         query_image = Image.open(path, mode= "r")
-        # query_pixmap = QPixmap(path)
     else:
         raise Exception("Enter RGB values ((R, G, B)), PIL Image, or image path (str)")
 
+    # you can create a Hash_DB but im just using Vector_DB
     db = VectorDB.get_DB(name= name)
 
     images = []
 
-    # if k == None:
-    #     k = len(db)
     vec = []
     if type(db) == VectorDB:
         vec = get_dominant_colors(query_image, num_colors= 3)
@@ -246,7 +307,6 @@ def search_color(name, rgb= None, path= None, k = 5):
         images = db.knn(colorhash(query_image, binbits = 7), k= k)
 
     for i, image in enumerate(images):
-        # images[i][0] = Image.open(image[0])
         images[i]["path"] = image["path"]
 
     if path:

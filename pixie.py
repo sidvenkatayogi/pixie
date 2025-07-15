@@ -1,6 +1,3 @@
-# TODO
-# fix color algorithm
-
 import sys
 import os
 import shutil
@@ -9,17 +6,17 @@ import json
 from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
-                             QFrame, QScrollArea, QDialog, QLineEdit, QProgressDialog,
-                             QFileDialog, QCheckBox, QMessageBox, QComboBox, QMenu, QInputDialog, QMessageBox)
+                             QFrame, QScrollArea, QDialog, QLineEdit, QMenu,
+                             QFileDialog, QCheckBox, QMessageBox, QComboBox, 
+                             QProgressDialog, QInputDialog, QMessageBox)
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor, QIcon
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 from uuid import uuid4
 from pins import download_board
 
 class CollectionThumbnail(QFrame):
-    """Widget representing a single collection thumbnail"""
     clicked = pyqtSignal()
-    collection_updated = pyqtSignal()  # New signal for updates
+    collection_updated = pyqtSignal()
     
     def __init__(self, uuid, collection_data, parent=None, font="Arial"):
         super().__init__()
@@ -30,7 +27,6 @@ class CollectionThumbnail(QFrame):
         self.setupUI()
         self.clicked.connect(lambda: self.parent.openCollection(self.uuid, self.collection_data))
         self.collection_updated.connect(self.parent.loadCollections)
-        
         
     def setupUI(self):
         self.setFixedSize(200, 250)
@@ -54,7 +50,6 @@ class CollectionThumbnail(QFrame):
         layout.setSpacing(0)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        # Add thumbnail label first
         self.thumbnail_label = QLabel()
         self.thumbnail_label.setFixedSize(180, 180)
         self.thumbnail_label.setAlignment(Qt.AlignCenter)
@@ -66,14 +61,13 @@ class CollectionThumbnail(QFrame):
             }
         """)
         layout.addWidget(self.thumbnail_label)
-        self.loadThumbnail()  # Load thumbnail right after creating label
+        self.loadThumbnail()  # load thumbnail picture right after creating label
 
-        # Then create info container
         info_container = QWidget()
         info_layout = QVBoxLayout(info_container)
-        info_layout.setContentsMargins(0, 5, 0, 0)  # Added top margin
+        info_layout.setContentsMargins(0, 5, 0, 0)
         info_layout.setSpacing(0)
-        # Collection name
+        
         name_label = QLabel(self.collection_data.get('name', 'Untitled'))
         name_label.setFont(QFont(self.font, 12, QFont.Bold))
         name_label.setAlignment(Qt.AlignLeft)
@@ -81,11 +75,9 @@ class CollectionThumbnail(QFrame):
         name_label.setStyleSheet("border: none; background: transparent;")
         info_layout.addWidget(name_label)
 
-        # Bottom row for info and menu button
         bottom_row = QHBoxLayout()
         bottom_row.setContentsMargins(0, 0, 0, 0)
 
-        # Collection info
         image_count = self.collection_data.get('image_count', 0)
         created_date = datetime.fromisoformat(self.collection_data.get('created_date', '')).strftime("%m/%d/%Y")
         info_label = QLabel(f"{image_count} Images\n{created_date}")
@@ -96,7 +88,6 @@ class CollectionThumbnail(QFrame):
         info_label.setStyleSheet("color: #666; border: none; background: transparent;")
         bottom_row.addWidget(info_label)
 
-        # Menu button
         self.menu_button = QPushButton("Edit")
         self.menu_button.setFont(QFont(self.font, 9))
         self.menu_button.setFixedSize(40, 32)
@@ -116,10 +107,8 @@ class CollectionThumbnail(QFrame):
         self.menu_button.clicked.connect(self.showMenu)
         bottom_row.addWidget(self.menu_button)
 
-        # Add bottom row to info layout
         info_layout.addLayout(bottom_row)
         
-        # Add info container to main layout
         layout.addWidget(info_container)
         
     def loadThumbnail(self):
@@ -1150,7 +1139,7 @@ def main():
     progress_geometry.moveCenter(screen_geometry.center())
     progress.move(progress_geometry.topLeft())
     
-    def on_import_finished(ImageGalleryApp):
+    def on_import_finished():
         progress.setLabelText("Done. Welcome to Pixie!")
         QTimer.singleShot(750, progress.close)
 
