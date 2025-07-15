@@ -266,6 +266,7 @@ class CreateCollectionDialog(QDialog):
         self.import_layout = QHBoxLayout()
         self.folder_button = QPushButton("From Folder")
         # self.folder_button.setFixedSize(85, 40)
+        self.folder_button.setFont(QFont(self.font, 10))
         self.folder_button.clicked.connect(self.setupFolderUI)
         # self.folder_button.setContentsMargins(0, 0, 5, 0)
         self.import_layout.addWidget(self.folder_button)
@@ -273,6 +274,7 @@ class CreateCollectionDialog(QDialog):
 
         self.pinterest_button = QPushButton("From Pinterest ")
         # self.pinterest_button.setFixedSize(85, 40)
+        self.pinterest_button.setFont(QFont(self.font, 10))
         self.pinterest_button.clicked.connect(self.setupPinterestUI)
         pinterest_icon = QIcon(os.path.join("assets","Pinterest-logo.png"))
         self.pinterest_button.setIcon(pinterest_icon)
@@ -310,14 +312,14 @@ class CreateCollectionDialog(QDialog):
             url_box = QVBoxLayout()
             # Collection name section
             url_label = QLabel("Public Board URL:")
-            url_label.setFont(QFont(self.font, 9))
-            url_label.setContentsMargins(3, 0, 0, 0)
+            url_label.setFont(QFont(self.font, 11))
+            url_label.setContentsMargins(2, 0, 0, 0)
             url_box.addWidget(url_label)
             
             self.url_input = QLineEdit()
             self.url_input.setFont(QFont(self.font, 9))
             self.url_input.setPlaceholderText("pinterest.com/user/board")
-            self.url_input.setMinimumHeight(32)
+            self.url_input.setMinimumHeight(28)
             self.url_input.textChanged.connect(self.updateUrlStatus)
             url_box.addWidget(self.url_input)
             
@@ -341,6 +343,7 @@ class CreateCollectionDialog(QDialog):
             
             # Thumbnail preview section
             thumbnail_label = QLabel("Thumbnail Preview")
+            thumbnail_label.setFont(QFont(self.font, 10))
             thumbnail_label.setAlignment(Qt.AlignCenter)
             thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
             right_column.addWidget(thumbnail_label)
@@ -348,6 +351,7 @@ class CreateCollectionDialog(QDialog):
             self.thumbnail_preview = QLabel()
             self.thumbnail_preview.setFixedSize(120, 90)  # Slightly larger thumbnail
             self.thumbnail_preview.setAlignment(Qt.AlignCenter)
+            self.thumbnail_preview.setFont(QFont(self.font, 10))
             self.thumbnail_preview.setStyleSheet("""
                 QLabel {
                     border: 2px solid #ccc;
@@ -358,12 +362,14 @@ class CreateCollectionDialog(QDialog):
                 }
             """)
             self.thumbnail_preview.setText("No thumbnail\nselected")
+            self.thumbnail_preview.setFont(QFont(self.font, 8))
             right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
             
             # Add some spacing after thumbnail
             right_column.addSpacing(6)
             
             self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
+            self.choose_thumbnail_button.setFont(QFont(self.font, 10))
             self.choose_thumbnail_button.setMinimumHeight(24)
             self.choose_thumbnail_button.setFixedWidth(120)
             self.choose_thumbnail_button.setStyleSheet("""
@@ -390,6 +396,7 @@ class CreateCollectionDialog(QDialog):
             button_layout.setSpacing(8)
             
             self.cancel_button = QPushButton("Cancel")
+            self.cancel_button.setFont(QFont(self.font, 9))
             self.cancel_button.setMinimumHeight(26)
             self.cancel_button.setMinimumWidth(75)
             self.cancel_button.setStyleSheet("""
@@ -408,6 +415,7 @@ class CreateCollectionDialog(QDialog):
             button_layout.addWidget(self.cancel_button)
             
             self.create_button = QPushButton("Create")
+            self.create_button.setFont(QFont(self.font, 9))
             self.create_button.setMinimumHeight(26)
             self.create_button.setMinimumWidth(75)
             self.create_button.setStyleSheet("""
@@ -455,24 +463,31 @@ class CreateCollectionDialog(QDialog):
             
             left_column.addLayout(self.import_layout)
             # Collection name section
-            left_column.addWidget(QLabel("Collection Name:"))
+            name_label = QLabel("Collection Name:")
+            name_label.setFont(QFont(self.font, 11))
+            left_column.addWidget(name_label)
             self.name_input = QLineEdit()
             self.name_input.setPlaceholderText("Enter collection name...")
+            self.name_input.setFont(QFont(self.font, 9))
             self.name_input.setMinimumHeight(24)
             left_column.addWidget(self.name_input)
             
             # Folder section
-            left_column.addWidget(QLabel("Folder:"))
+            folder_label = QLabel("Folder:")
+            folder_label.setFont(QFont(self.font, 11))
+            left_column.addWidget(folder_label)
             folder_layout = QHBoxLayout()
             folder_layout.setSpacing(6)
             
             self.folder_input = QLineEdit()
             self.folder_input.setPlaceholderText("Select folder containing images...")
+            self.folder_input.setFont(QFont(self.font, 9))
             self.folder_input.setReadOnly(True)
             self.folder_input.setMinimumHeight(24)
             folder_layout.addWidget(self.folder_input)
             
             self.browse_button = QPushButton("Browse")
+            self.browse_button.setFont(QFont(self.font, 9))
             self.browse_button.setMinimumHeight(24)
             self.browse_button.setMaximumWidth(65)
             self.browse_button.clicked.connect(self.selectFolder)
@@ -482,6 +497,7 @@ class CreateCollectionDialog(QDialog):
             
             # Include subfolders checkbox
             self.subfolders_checkbox = QCheckBox("Include Subfolders")
+            self.subfolders_checkbox.setFont(QFont(self.font, 9))
             self.subfolders_checkbox.setStyleSheet("font-size: 11px;")
 
             self.subfolders_checkbox.stateChanged.connect(self.updateFolderStatus)
@@ -491,6 +507,7 @@ class CreateCollectionDialog(QDialog):
             self.folder_status_label = QLabel("")
             self.folder_status_label.setWordWrap(True)
             self.folder_status_label.setMinimumHeight(18)
+            self.folder_status_label.setFont(QFont(self.font, 10))
             self.folder_status_label.setStyleSheet("font-size: 10px;")
             left_column.addWidget(self.folder_status_label)
             
@@ -503,6 +520,7 @@ class CreateCollectionDialog(QDialog):
             # Thumbnail preview section
             thumbnail_label = QLabel("Thumbnail Preview")
             thumbnail_label.setAlignment(Qt.AlignCenter)
+            thumbnail_label.setFont(QFont(self.font, 10))
             thumbnail_label.setStyleSheet("font-weight: bold; font-size: 10px; margin-bottom: 2px;")
             right_column.addWidget(thumbnail_label)
             
@@ -519,12 +537,14 @@ class CreateCollectionDialog(QDialog):
                 }
             """)
             self.thumbnail_preview.setText("No thumbnail\nselected")
+            self.thumbnail_preview.setFont(QFont(self.font, 8))
             right_column.addWidget(self.thumbnail_preview, 0, Qt.AlignHCenter)
             
             # Add some spacing after thumbnail
             right_column.addSpacing(6)
             
             self.choose_thumbnail_button = QPushButton("Choose Thumbnail")
+            self.choose_thumbnail_button.setFont(QFont(self.font, 10))
             self.choose_thumbnail_button.setMinimumHeight(24)
             self.choose_thumbnail_button.setFixedWidth(120)
             self.choose_thumbnail_button.setStyleSheet("""
@@ -551,6 +571,7 @@ class CreateCollectionDialog(QDialog):
             button_layout.setSpacing(8)
             
             self.cancel_button = QPushButton("Cancel")
+            self.cancel_button.setFont(QFont(self.font, 9))
             self.cancel_button.setMinimumHeight(26)
             self.cancel_button.setMinimumWidth(75)
             self.cancel_button.setStyleSheet("""
@@ -569,6 +590,7 @@ class CreateCollectionDialog(QDialog):
             button_layout.addWidget(self.cancel_button)
             
             self.create_button = QPushButton("Create")
+            self.create_button.setFont(QFont(self.font, 9))
             self.create_button.setMinimumHeight(26)
             self.create_button.setMinimumWidth(75)
             self.create_button.setStyleSheet("""
@@ -749,7 +771,7 @@ class CollectionsLandingPage(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Your Collections - Image Gallery")
+        self.setWindowTitle("Your Collections - Pixie")
         self.setGeometry(100, 100, 1200, 800)
         
         self.loadCustomFont()
@@ -790,10 +812,12 @@ class CollectionsLandingPage(QMainWindow):
         
         # Sort dropdown
         sort_label = QLabel("Sort By:")
+        sort_label.setFont(QFont(self.font, 11))
         header_layout.addWidget(sort_label)
         
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(["Name", "Date Created", "Image Count"])
+        self.sort_combo.setFont(QFont(self.font, 11))
         # self.sort_combo.addItems(["Name", "Date Created", "Date Modified", "Image Count"])
         self.sort_combo.currentTextChanged.connect(self.sortCollections)
         header_layout.addWidget(self.sort_combo)
@@ -818,16 +842,35 @@ class CollectionsLandingPage(QMainWindow):
         self.empty_label = QLabel("You have no collections saved. Create a new one with the + in the bottom right!")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setFont(QFont(self.font, 14))
-        self.empty_label.setStyleSheet("color: #666; margin: 50px;")
+        self.empty_label.setStyleSheet("color: #666; margin: 50px; padding-bottom: 65px")
         self.empty_label.hide()
         main_layout.addWidget(self.empty_label)
         
         # Plus button (bottom right)
         self.plus_button = QPushButton("+")
         self.plus_button.setFixedSize(60, 60)
+        # self.plus_button.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #9e9e9e;
+        #         color: white;
+        #         border: none;
+        #         border-radius: 30px;
+        #         font-size: 24px;
+        #         font-weight: bold;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #6b6b6b;
+        #     }
+        #     QPushButton:pressed {
+        #         background-color: #3d3d3d;
+        #     }
+        # """)
         self.plus_button.setStyleSheet("""
             QPushButton {
-                background-color: #9e9e9e;
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 0.5,
+                    stop: 0 blue, stop: 0.833 indigo, stop: 1 violet
+                );
                 color: white;
                 border: none;
                 border-radius: 30px;
@@ -835,10 +878,16 @@ class CollectionsLandingPage(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #6b6b6b;
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 0.5,
+                    stop: 0 blue, stop: 1 violet
+                );
             }
             QPushButton:pressed {
-                background-color: #3d3d3d;
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 0.5,
+                    stop: 0 violet, stop: 0.333 red, stop: 0.833 orange, stop: 1 yellow
+                );
             }
         """)
         self.plus_button.clicked.connect(self.createNewCollection)
@@ -865,6 +914,7 @@ class CollectionsLandingPage(QMainWindow):
         else:
             self.collections = {}
             
+        self.sortCollections(self.sort_combo.currentText())
         self.updateCollectionsDisplay()
         
     def saveCollections(self):
@@ -879,7 +929,7 @@ class CollectionsLandingPage(QMainWindow):
         """Update the display of collections"""
         # Clear existing thumbnails
         for i in reversed(range(self.collections_layout.count())):
-            self.collections_layout.itemAt(i).widget().setParent(None)
+            self.collections_layout.itemAt(i).widget().deleteLater()
             
         if not self.collections:
             self.scroll_area.hide()
@@ -1097,7 +1147,7 @@ def main():
     progress.move(progress_geometry.topLeft())
     
     def on_import_finished(ImageGalleryApp):
-        progress.setLabelText("Done. Welcome to Image Gallery!")
+        progress.setLabelText("Done. Welcome to Pixie!")
         QTimer.singleShot(750, progress.close)
 
     def on_import_error(error_msg):

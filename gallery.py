@@ -31,7 +31,7 @@ class ImageGalleryApp(QMainWindow):
         self.uuid = uuid
         self.collection_data = collection_data
         self.color_db = VectorDB.get_DB(self.uuid)
-        self.setWindowTitle("Image Gallery")
+        self.setWindowTitle("Collection View - Pixie")
         self.setGeometry(100, 100, 1400, 768)
 
         self.animation_timer = QTimer()
