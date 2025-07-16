@@ -720,6 +720,7 @@ class CreateCollectionDialog(QDialog):
 
             # Show progress dialog
             progress_dialog = QProgressDialog(f"Downloading Board: {self.url_input.text().strip()}...", "Cancel", 0, 0, parent=self)
+            progress_dialog.setWindowTitle("Loading")
             progress_dialog.setWindowModality(Qt.WindowModal)
             # progress_dialog.setWindowFlags(
             #     progress_dialog.windowFlags() & ~Qt.WindowCloseButtonHint
@@ -1029,6 +1030,7 @@ class CollectionsLandingPage(QMainWindow):
 
         # Show progress dialog
         progress_dialog = QProgressDialog("Creating color index...", None, 0, collection_data["image_count"], self)
+        progress_dialog.setWindowTitle("Loading")
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setWindowFlags(
             progress_dialog.windowFlags() & ~Qt.WindowCloseButtonHint

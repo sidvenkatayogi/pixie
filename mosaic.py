@@ -505,15 +505,17 @@ class ImageMosaicApp(QMainWindow):
 
     def selectImage(self):
         self.queryImageDialog()
-        file_path = self.query_image_path
-        filename = os.path.basename(file_path)
-        self.image_path_label.setText(f"Selected: {filename}")
+        if hasattr(self,"query_image_path") and hasattr(self,"image_path_label"):
+            file_path = self.query_image_path
+            filename = os.path.basename(file_path)
+            self.image_path_label.setText(f"Selected: {filename}")
 
     def selectColorImage(self):
         self.queryImageDialog()
-        file_path = self.query_image_path
-        filename = os.path.basename(file_path)
-        self.color_image_path_label.setText(f"Selected: {filename}")
+        if hasattr(self,"query_image_path") and hasattr(self,"color_image_path_label"):
+            file_path = self.query_image_path
+            filename = os.path.basename(file_path)
+            self.color_image_path_label.setText(f"Selected: {filename}")
 
     def setupColorSearchControls(self):
         self.clearSearchControls()
@@ -661,6 +663,7 @@ class ImageMosaicApp(QMainWindow):
         
         # Show progress dialog
         progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", None, 0, self.collection_data["image_count"], self)
+        progress_dialog.setWindowTitle("Loading")
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setWindowFlag(Qt.WindowCloseButtonHint, False)
         progress_dialog.show()
@@ -710,7 +713,7 @@ class ImageMosaicApp(QMainWindow):
             # search_types.append("Image Content Search (CLIP)")
             
             # Remove CLIP index creation button if it exists
-            if (self, 'create_clip_btn') and self.create_clip_btn:
+            if hasattr(self, 'create_clip_btn') and self.create_clip_btn:
                 self.create_clip_btn.setParent(None)
                 self.create_clip_btn.deleteLater()
                 self.create_clip_btn = None
