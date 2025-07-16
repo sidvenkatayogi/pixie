@@ -23,7 +23,7 @@ import vcolorpicker
 
 # from PIL.ImageQt import ImageQt # only works for PyQt6
 
-class ImageGalleryApp(QMainWindow):
+class ImageMosaicApp(QMainWindow):
     def __init__(self, uuid, collection_data, font= "Arial"):
         super().__init__()
         self.font = font
@@ -121,7 +121,7 @@ class ImageGalleryApp(QMainWindow):
                             self.color_search_mode.setCurrentText("Reference Image")
                         self.color_image_path_label.setText(f"Selected: {path}")
                         self.query_image_path = path
-                        self.generateGallery()
+                        self.generateMosaic()
                     elif action == open_palette:
                         if preview:
                             preview.exec_()
@@ -130,7 +130,7 @@ class ImageGalleryApp(QMainWindow):
                             self.search_type_combo.setCurrentText("Image Similarity Search (DINO)")
                         self.image_path_label.setText(f"Selected: {path}")
                         self.query_image_path = path
-                        self.generateGallery()
+                        self.generateMosaic()
                     elif action == open_file:
                         self.openImage(path)
                     elif action == open_location:
@@ -417,7 +417,7 @@ class ImageGalleryApp(QMainWindow):
                 background-color: #3d8b40;
             }
         """)
-        self.generate_button.clicked.connect(self.generateGallery)
+        self.generate_button.clicked.connect(self.generateMosaic)
         layout.addWidget(self.generate_button)
         
         # Clear button
@@ -440,7 +440,7 @@ class ImageGalleryApp(QMainWindow):
                 background-color: #872222;
             }
         """)
-        self.clear_button.clicked.connect(self.clearGallery)
+        self.clear_button.clicked.connect(self.clearMosaic)
         layout.addWidget(self.clear_button)
         
         # Add spacer to push everything to top
@@ -739,7 +739,7 @@ class ImageGalleryApp(QMainWindow):
         if index >= 0:
             self.search_type_combo.setCurrentIndex(index)
 
-    def clearGallery(self):
+    def clearMosaic(self):
         # Stop animations
         self.animation_timer.stop()
         self.zoom_animation_timer.stop()
@@ -762,9 +762,9 @@ class ImageGalleryApp(QMainWindow):
         self.animation_time = 0.0
         self.zoom_animating = False
 
-    def generateGallery(self):
-        # Clear existing gallery first
-        self.clearGallery()
+    def generateMosaic(self):
+        # Clear existing mosaic first
+        self.clearMosaic()
         
         # Get parameters from UI
         num_images = self.image_count_slider.value()
@@ -877,7 +877,7 @@ class ImageGalleryApp(QMainWindow):
                 self.hexagons(images)
                 
         except Exception as e:
-            print(f"Error generating gallery: {e}")
+            print(f"Error generating mosaic: {e}")
             QMessageBox.warning(self, "Error", f"{e}")
     
     # zoom stuff
@@ -1404,9 +1404,4 @@ class ImageGalleryApp(QMainWindow):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ImageGalleryApp()
-    window.show()
-    
-    # Remove the automatic execution code and let the GUI handle everything
-    sys.exit(app.exec_())
+    pass

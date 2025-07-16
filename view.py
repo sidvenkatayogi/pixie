@@ -37,7 +37,7 @@ class CustomGraphicsView(QGraphicsView):
         
         self.friction = 0.95
         self.min_velocity = 1  # stop kinetic panning below this velocity
-        self.velocity_scale = 0.3
+        self.velocity_scale = 0.5
 
         self.centerOn(0, 0)
 

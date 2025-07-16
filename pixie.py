@@ -1072,19 +1072,19 @@ class CollectionsLandingPage(QMainWindow):
         return count
         
     def openCollection(self, uuid, collection_data):
-        # Create gallery window without parent
-        self.gallery_window = ImageGalleryApp(uuid, collection_data)
+        # Create mosaic window without parent
+        self.mosaic_window = ImageMosaicApp(uuid, collection_data)
         # Set window flags to make it appear in taskbar
-        self.gallery_window.setWindowFlags(Qt.Window)
+        self.mosaic_window.setWindowFlags(Qt.Window)
         
         # Store reference to landing page instead of parent
-        self.gallery_window.landing_page = self
+        self.mosaic_window.landing_page = self
         
-        self.gallery_window.showMaximized()
+        self.mosaic_window.showMaximized()
         self.hide()
         
-        self.gallery_window.setAttribute(Qt.WA_DeleteOnClose)
-        self.gallery_window.destroyed.connect(self.showMaximized)
+        self.mosaic_window.setAttribute(Qt.WA_DeleteOnClose)
+        self.mosaic_window.destroyed.connect(self.showMaximized)
 
 
 def main():
@@ -1103,10 +1103,10 @@ def main():
         def run(self):
             try:
                 # Import in thread
-                global ImageGalleryApp
-                from gallery import ImageGalleryApp
+                global ImageMosaicApp
+                from mosaic import ImageMosaicApp
                 
-                self.finished.emit(ImageGalleryApp)
+                self.finished.emit(ImageMosaicApp)
             except Exception as e:
                 self.error.emit(str(e))
 
