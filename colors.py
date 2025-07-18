@@ -3,8 +3,9 @@ from PIL import Image
 import numpy as np
 import os
 from skimage.color import rgb2lab
+import colorsys
 
-def get_dominant_colors(image, palette_size=16, num_colors=5):
+def get_dominant_colors(image, palette_size=8, num_colors=5):
     """
     Get the dominant colors of an image
 
@@ -33,13 +34,13 @@ def get_dominant_colors(image, palette_size=16, num_colors=5):
 
     i = 0
     while len(dominant_colors) < num_colors and i < len(color_counts):
-        if color_counts[i][0] > (0.025 * max): # if color is too insignificant, not dominant
+        if color_counts[i][0] > (0.001 * max): # if color is too insignificant, not dominant
             palette_index = color_counts[i][1]
 
             # palette is 1 x (3*num palette colors)
             rgbf = palette[palette_index*3:palette_index*3+3] + [color_counts[i][0]]
             # only add colors if they are distinct from other dominant colors
-            if (i == 0 or all(dist(c1[:3], rgbf[:3]) > 100 for c1 in dominant_colors)):
+            if (i == 0 or all(labdist(c1[:3], rgbf[:3]) > 20 for c1 in dominant_colors)):
                 palette_index = color_counts[i][1]
                 dominant_colors.append(rgbf)
         i += 1
@@ -118,7 +119,7 @@ def labdist(c1, c2):
     return delta_e
     
 
-def multidist(i1, i2, k= 5):
+def multidist(i1, i2, k = 4):
     """
     Get color distance of 2 color vectors representing multiple colors by weighting distances by frequency of color
 
@@ -133,29 +134,33 @@ def multidist(i1, i2, k= 5):
     """
     i1 = i1.reshape(int(len(i1)/4), 4)
     i2 = i2.reshape(int(len(i2)/4), 4)
-    i1 = i1[:min(len(i2),k+1)]
-    i2 = i2[:min(len(i2),k+1)]
+    i1 = i1[:min(len(i1),k)]
+    i2 = i2[:min(len(i2),k)]
+
     distance = 0
     tf = 0
     d = {}
+    maxf1 = i1[0][3]
+    maxf2 = i2[0][3]
     for j, rgbf1 in enumerate(i1): # i also tried a rank wise weighting using j and k but it didn't work as well
-        for k, rgbf2 in enumerate(i2):
+        for m, rgbf2 in enumerate(i2):
             # cache each pair bc labdist is symmetric
-            key = tuple([tuple(rgbf1), tuple(rgbf2)].sort())
+            key = tuple(sorted([tuple(rgbf1), tuple(rgbf2)]))
             if key in d:
                 distance += d[key][0]
                 tf += d[key][1]
             else:
-                f1 = rgbf1[-1]
-                f2 = rgbf2[-1]
+                f1 = rgbf1[-1]/maxf1
+                f2 = rgbf2[-1]/maxf2
                 gmf = np.sqrt(f1 * f2)
                 labd = labdist(rgbf1[:3], rgbf2[:3]) * gmf # weight by geometric mean of the 2 frequencies
                 distance += labd
                 tf += gmf
                 d[key] = (labd, gmf)
-    distance = (distance / tf) if tf != 0 else 0 # normalize
-    return distance
 
+    distance /= (len(i1) * len(i2)) # normalize by how many colors there was
+    distance = (distance / tf) if tf != 0 else 0 # normalize by earlier weights
+    return distance
 
 def create_bar(height, width, color):
     """

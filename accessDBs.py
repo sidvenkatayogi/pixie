@@ -151,6 +151,8 @@ def add_color(name, folder_path, explore= False, progress=None):
         db = VectorDB(name= name)
 
     for i, path in enumerate(tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB...")):
+        if i == 150:
+            breakpoint()
         try:
             if type(db) == VectorDB:
                 if db.get_vector(path) == None:

@@ -103,8 +103,10 @@ class ImageMosaicApp(QMainWindow):
                         preview_layout.addWidget(palette_label)
                         
                     # Create context menu
-                    menu = QMenu()
-                    query_visual = menu.addAction("Find Visually Similar")
+                    menu = QMenu() 
+                    query_visual = None
+                    if self.collection_data["dino"]:
+                        query_visual = menu.addAction("Find Visually Similar")
                     query_color = menu.addAction("Find Colorfully Similar")
                     open_palette = None
                     if c:
@@ -126,11 +128,13 @@ class ImageMosaicApp(QMainWindow):
                         if preview:
                             preview.exec_()
                     elif action == query_visual:
-                        if self.search_type_combo.currentText() != "Image Similarity Search (DINO)":
-                            self.search_type_combo.setCurrentText("Image Similarity Search (DINO)")
-                        self.image_path_label.setText(f"Selected: {path}")
-                        self.query_image_path = path
-                        self.generateMosaic()
+                        if query_visual:
+                            if self.search_type_combo.currentText() != "Image Similarity Search (DINO)":
+                                self.search_type_combo.setCurrentText("Image Similarity Search (DINO)")
+
+                            self.image_path_label.setText(f"Selected: {path}")
+                            self.query_image_path = path
+                            self.generateMosaic()
                     elif action == open_file:
                         self.openImage(path)
                     elif action == open_location:
@@ -608,7 +612,7 @@ class ImageMosaicApp(QMainWindow):
         image_label = QLabel("Reference Image:")
         image_label.setFont(QFont(self.font, 11))
         self.search_controls_layout.addWidget(image_label)
-        
+        print("usdfhsfa")
         self.image_path_label = QLabel("No image selected")
         self.image_path_label.setFont(QFont(self.font, 11))
         self.image_path_label.setWordWrap(True)
