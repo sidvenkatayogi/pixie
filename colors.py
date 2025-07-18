@@ -61,14 +61,14 @@ def dist(c1, c2):
     Returns:
         float
     """
-    c1r, c1g, c1b, = c1[:3]
-    c2r, c2g, c2b = c2[:3]
+    c1x, c1y, c1z, = c1[:3]
+    c2x, c2y, c2z = c2[:3]
 
-    r = c1r - c2r
-    g = c1g - c2g
-    b = c1b - c2b
+    x = c1x - c2x
+    y = c1y - c2y
+    z = c1z - c2z
 
-    return np.sqrt(r**2 + g**2 + b**2)
+    return np.sqrt(x**2 + y**2 + z**2)
 
 def wdist(c1, c2):
     """
@@ -150,15 +150,25 @@ def multidist(i1, i2, k = 4):
                 distance += d[key][0]
                 tf += d[key][1]
             else:
+                h1, s1, v1 = colorsys.rgb_to_hsv(rgbf1[0]/255, rgbf1[1]/255, rgbf1[2]/255)
+                h2, s2, v2 = colorsys.rgb_to_hsv(rgbf2[0]/255, rgbf2[1]/255, rgbf2[2]/255)
+                hd = (min(abs(h1 - h2), 1 - abs(h1 - h2))*2) # try distance in both directions bc hue is circular and convert between 0-1
+                hw = 300
+                sw = (s1 + s2)/2 # saturation weight, more saturation means weigh hue more
+                v = (1 - abs((v1+v2)/2 - 0.1)/0.9) # value weight, low-medium value means weigh hue more
+                p = hw * hd * sw * v # penalize different hue when it's saturated and low-medium value
+                
+                # normalize frequency by the frequency of the most dominant color
                 f1 = rgbf1[-1]/maxf1
                 f2 = rgbf2[-1]/maxf2
-                gmf = np.sqrt(f1 * f2)
-                labd = labdist(rgbf1[:3], rgbf2[:3]) * gmf # weight by geometric mean of the 2 frequencies
+                gmf = np.sqrt(f1 * f2) # lower power on frequencies reduces noise on colorful images
+                labd = (labdist(rgbf1[:3], rgbf2[:3]) + p) * gmf # weight by the 2 frequencies
                 distance += labd
                 tf += gmf
                 d[key] = (labd, gmf)
-
-    distance /= (len(i1) * len(i2)) # normalize by how many colors there was
+    # normalize by how many colors there was so that sets with lower number of colors don't have lower distance
+    # i think the tf should've done this but the above problem was happening so I did this
+    distance /= (len(i1) * len(i2))
     distance = (distance / tf) if tf != 0 else 0 # normalize by earlier weights
     return distance
 
