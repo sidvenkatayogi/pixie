@@ -154,7 +154,7 @@ def add_color(name, folder_path, explore= False, progress=None):
         try:
             if type(db) == VectorDB:
                 if db.get_vector(path) == None:
-                    cols = get_dominant_colors(Image.open(path, mode= "r"), num_colors= 4)
+                    cols = get_dominant_colors(Image.open(path, mode= "r"), num_colors= 5)
                     db.add_vector(id= path,vec= cols)
             elif type(db) == HashDB:
                 hash = colorhash(Image.open(path), binbits = 7)
@@ -300,7 +300,7 @@ def search_color(name, rgb= None, path= None, k = 5):
 
     vec = []
     if type(db) == VectorDB:
-        vec = get_dominant_colors(query_image, num_colors= 3)
+        vec = get_dominant_colors(query_image, num_colors= 5)
         images = db.knn(vec, k= k)
     elif type(db) == HashDB:
         images = db.knn(colorhash(query_image, binbits = 7), k= k)

@@ -1211,7 +1211,7 @@ class ImageMosaicApp(QMainWindow):
                 if np.all(self.color_db.get_vector(image["path"]) != None):
                     l = self.color_db.get_vector(image["path"])
                 else:
-                    l = get_dominant_colors(Image.open(image["path"]).convert('RGB'))
+                    l = get_dominant_colors(Image.open(image["path"]).convert('RGB'), num_colors= 5)
                 image["colors"] = l
 
             l = l.reshape(int(len(l)/4), 4)

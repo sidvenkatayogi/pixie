@@ -85,7 +85,7 @@ class VectorDB:
         """
         vec = self.get_vector(id)
         for id2, vec2 in self.vector_data.items():
-            distance = colors.multidist(vec, vec2)
+            distance = colors.multidist(vec, vec2, k= 4)
             self.vector_index[id2][id] = distance
 
     def __len__(self):
@@ -107,7 +107,7 @@ class VectorDB:
         """
         results = []
         for id, vec in tqdm(self.vector_data.items(), desc= "Searching DB..."):
-            distance = colors.multidist(query, vec)
+            distance = colors.multidist(query, vec, k= 4)
             results.append({"path": id, "distance": distance, "colors": vec})
         results.sort(key= lambda x: x["distance"])
         return results[:k]

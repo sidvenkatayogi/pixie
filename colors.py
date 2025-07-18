@@ -118,7 +118,7 @@ def labdist(c1, c2):
     return delta_e
     
 
-def multidist(i1, i2):
+def multidist(i1, i2, k= 5):
     """
     Get color distance of 2 color vectors representing multiple colors by weighting distances by frequency of color
 
@@ -127,12 +127,14 @@ def multidist(i1, i2):
             [red (of most dominant color), blue, green, frequency, red (of 2nd most dominant color), blue, green, frequency, ...]
         i2 (list or numpy.ndarray): second/end RGBF vector with the following structure:
             [red (of most dominant color), blue, green, frequency, red (of 2nd most dominant color), blue, green, frequency, ...]
-
+        k (int): max number of colors to compare in each set
     Returns:
         float
     """
     i1 = i1.reshape(int(len(i1)/4), 4)
     i2 = i2.reshape(int(len(i2)/4), 4)
+    i1 = i1[:min(len(i2),k+1)]
+    i2 = i2[:min(len(i2),k+1)]
     distance = 0
     tf = 0
     d = {}
