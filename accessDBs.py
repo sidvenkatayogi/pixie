@@ -95,15 +95,11 @@ def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", pr
                 elif model == "clip":
                     embeddings_batch = clip_model.encode_image(batch_tensor)
             if i == len(image_paths) - 1:
-                time.sleep(0.3) # bro i dont even think this sleep fixes it but the pinterest dl creates threads and then they keep running even after its done downloading
-                # i think thats affecting the adding bc it'll freeze at 100% images
-                # but it works fine if a add print statments???
-                # and the debugger don't work on this so this is all i could think of
-                # im not even sure if the bug is in this section but its my best guess is when moving the tensor to cpu but i lowk have no idea how that works
+                time.sleep(0.3)
             all_embeddings.append(embeddings_batch.cpu())
             current_batch_images = []
         if progress:
-            progress.setValue(i + 1)
+            progress(i + 1)
 
     vectors = torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
@@ -129,7 +125,6 @@ def add_visual(name, folder_path, explore=False, batch_size=32, model="dino", pr
     faiss.write_index(index, os.path.join("collections", name, f"{name}_{model}.index"))
     with open(os.path.join("collections", name, f"{name}_{model}_paths.json"), "w") as f:
         json.dump(image_paths, f)
-
 
 
 def add_color(name, folder_path, explore= False, progress=None):
@@ -164,7 +159,7 @@ def add_color(name, folder_path, explore= False, progress=None):
         except Exception as e:
             print(f"Error processing {path} : {e}")
         if progress:
-            progress.setValue(i + 1)
+            progress(i + 1)
             
     db.save_DB()
 

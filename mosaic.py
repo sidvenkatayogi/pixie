@@ -641,48 +641,52 @@ class ImageMosaicApp(QMainWindow):
         if not self.collection_data:
             return
         
-
         class IndexCreationWorker(QThread):
-            progress = pyqtSignal(str)
+            progress = pyqtSignal(int)
             finished = pyqtSignal()
             error = pyqtSignal(str)
             
-            def __init__(self, key, folder, explore, index_type, progress_dialog):
+            def __init__(self, key, folder, explore, index_type):
                 super().__init__()
                 self.key = key
                 self.folder = folder 
                 self.explore = explore
                 self.index_type = index_type
-                self.progress_dialog = progress_dialog
 
             def run(self):
                 try:
-                    self.progress.emit(f"Creating {self.index_type.upper()} index...")
-                    add_visual(self.key, self.folder, self.explore, model=self.index_type, progress= self.progress_dialog)
+                    def progress_callback(current):
+                        self.progress.emit(current)
+                    
+                    add_visual(self.key, self.folder, self.explore, 
+                            model=self.index_type, 
+                            progress=progress_callback)
+                            
                     self.finished.emit()
                 except Exception as e:
                     self.error.emit(str(e))
         
-        # Show progress dialog
+        # show progress dialog
         progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", None, 0, self.collection_data["image_count"], self)
         progress_dialog.setWindowTitle("Loading")
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setWindowFlag(Qt.WindowCloseButtonHint, False)
         progress_dialog.show()
         
-        # Start worker
         self.index_worker = IndexCreationWorker(
-            # self.collection_data['name'],
             self.uuid,
             self.collection_data['folder'], 
             self.collection_data['subfolders'],
-            index_type,
-            progress_dialog
+            index_type
         )
+        
+        def on_progress_value(value):
+            progress_dialog.setValue(value)
+            progress_dialog.setLabelText(f"Creating {index_type.upper()} index... ({value}/{self.collection_data["image_count"]})")
+
         
         def on_finished():
             progress_dialog.close()
-            # self.updateSearchModeOptions()
             self.collection_data[index_type] = True
             QMessageBox.information(self, "Success", f"{index_type.upper()} index created successfully!")
 
@@ -700,6 +704,7 @@ class ImageMosaicApp(QMainWindow):
             progress_dialog.close()
             QMessageBox.critical(self, "Error", f"Failed to create index: {error_msg}")
         
+        self.index_worker.progress.connect(on_progress_value)
         self.index_worker.finished.connect(on_finished)
         self.index_worker.error.connect(on_error)
         self.index_worker.start()
@@ -1038,8 +1043,7 @@ class ImageMosaicApp(QMainWindow):
 
     def imageToQPixmap(self, image_info):
         if isinstance(image_info, list):
-            # start = time.time()
-            # Create progress dialog
+            # create progress dialog
             progress = QProgressDialog("Rendering images...", None, 0, len(image_info), self)
             progress.setWindowTitle("Loading")
             progress.setWindowModality(Qt.WindowModal)
@@ -1067,6 +1071,7 @@ class ImageMosaicApp(QMainWindow):
             for i, image in enumerate(image_info):
                 pixmaps.append(self.imageToQPixmap(image))
                 progress.setValue(i + 1)
+                progress.setLabelText(f"Rendering images... ({i+1}/{len(image_info)})")
                 QApplication.processEvents()
             # end = time.time()
             # print(f"{end-start} seconds")

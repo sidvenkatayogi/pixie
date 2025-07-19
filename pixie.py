@@ -1006,7 +1006,6 @@ class CollectionsLandingPage(QMainWindow):
         class IndexWorker(QThread):
             progress = pyqtSignal(int)
             finished = pyqtSignal()
-            value_changed = pyqtSignal(int)  # Add signal for progress updates
             
             def __init__(self, key, folder, explore):  # Remove progress_dialog from constructor
                 super().__init__()
@@ -1016,20 +1015,15 @@ class CollectionsLandingPage(QMainWindow):
                 
             def run(self):
                 try:
-                    # Create wrapper class to emit progress signals
-                    class ProgressEmitter:
-                        def __init__(self, signal):
-                            self.signal = signal
-                        def setValue(self, value):
-                            self.signal.emit(value)
+                    def progress_callback(current):
+                        self.progress.emit(current)
                             
-                    progress_emitter = ProgressEmitter(self.value_changed)
-                    add_color(self.key, self.folder, self.explore, progress=progress_emitter)
+                    add_color(self.key, self.folder, self.explore, progress=progress_callback)
                     self.finished.emit()
                 except Exception as e:
                     print(f"Error in worker thread: {e}")
 
-        # Show progress dialog
+        # show progress dialog
         progress_dialog = QProgressDialog("Creating color index...", None, 0, collection_data["image_count"], self)
         progress_dialog.setWindowTitle("Loading")
         progress_dialog.setWindowModality(Qt.WindowModal)
@@ -1045,11 +1039,15 @@ class CollectionsLandingPage(QMainWindow):
             collection_data['folder'], 
             collection_data['subfolders']
         )
+        def on_progress_value(value):
+            progress_dialog.setValue(value)
+            progress_dialog.setLabelText(f"Creating color index... ({value}/{collection_data["image_count"]})")
+
         def x():
             progress_dialog.close()
             self.openCollection(uuid, collection_data)
-        # Connect signals
-        self.index_worker.value_changed.connect(progress_dialog.setValue)
+            
+        self.index_worker.progress.connect(on_progress_value)
         self.index_worker.finished.connect(x)
         self.index_worker.start()
             
