@@ -47,6 +47,7 @@ def download_board(url):
 
         # 3. Download Images
         # Download images to a specified directory
+        os.makedirs("pinterest", exist_ok=True)
         output_dir = os.path.join("pinterest", username, board_name)
         
         # Check if directory exists and remove it

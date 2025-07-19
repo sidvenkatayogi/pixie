@@ -5,7 +5,11 @@
 *.webp
 *.gif
 *.m4v
-chroma/
+!assets/Pinterest-logo.png
+build/
+dist/
+models/
+*.spec
 __pycache__/
 *.json
 *.index

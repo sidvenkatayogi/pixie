@@ -1,6 +1,6 @@
-from PIL import Image
+
 import numpy as np
-from tqdm import tqdm
+import sys
 import os
 import faiss
 import json
@@ -8,12 +8,21 @@ import time
 import torch
 import torchvision.transforms.v2 as tfms
 import open_clip
+from tqdm import tqdm
+from PIL import Image
 from imagehash import colorhash
 from vectorDB import VectorDB
 from hashDB import HashDB
 from colors import get_dominant_colors
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" # quick fix for a faiss bug
+
+if hasattr(sys, '_MEIPASS'):
+    torch.hub.set_dir(os.path.join(sys._MEIPASS, 'models', 'torch_hub'))
+    openclip_cache = os.path.join(sys._MEIPASS, 'models', 'openclip')
+else:
+    torch.hub.set_dir('./models/torch_hub')
+    openclip_cache = './models/openclip'
 
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -31,7 +40,8 @@ open_clip_pretrained_weights = "laion2b_s34b_b79k"
 clip_model, clip_preprocess, clip_tokenizer = open_clip.create_model_and_transforms(
     open_clip_model_name,
     pretrained=open_clip_pretrained_weights,
-    device=device
+    device=device,
+    cache_dir=openclip_cache
 )
 
 

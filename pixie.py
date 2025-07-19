@@ -15,6 +15,13 @@ from datetime import datetime
 from pins import download_board
 
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
 class CollectionThumbnail(QFrame):
     clicked = pyqtSignal()
     collection_updated = pyqtSignal()
@@ -267,7 +274,7 @@ class CreateCollectionDialog(QDialog):
         # self.pinterest_button.setFixedSize(85, 40)
         self.pinterest_button.setFont(QFont(self.font, 10))
         self.pinterest_button.clicked.connect(self.setupPinterestUI)
-        pinterest_icon = QIcon(os.path.join("assets","Pinterest-logo.png"))
+        pinterest_icon = QIcon(resource_path(os.path.join("assets","Pinterest-logo.png")))
         self.pinterest_button.setIcon(pinterest_icon)
         self.pinterest_button.setIconSize(QSize(14, 14))
         self.pinterest_button.setLayoutDirection(Qt.RightToLeft)
@@ -617,7 +624,7 @@ class CreateCollectionDialog(QDialog):
             self.current_import = 1
         
     def selectFolder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Image Folder")
+        folder = QFileDialog.getExistingDirectory(self, "Select Image Folder", os.path.expanduser("~"))
         if folder:
             self.selected_folder = folder
             self.folder_input.setText(folder)
@@ -768,6 +775,7 @@ class CollectionsLandingPage(QMainWindow):
         super().__init__()
         self.setWindowTitle("Your Collections - Pixie")
         self.setGeometry(100, 100, 1200, 800)
+        self.setWindowIcon(QIcon(resource_path(os.path.join("assets", "pixie.ico"))))
         
         self.loadCustomFont()
 
@@ -779,7 +787,7 @@ class CollectionsLandingPage(QMainWindow):
         self.loadCollections()
 
     def loadCustomFont(self):
-        font_id = QFontDatabase.addApplicationFont(os.path.join("assets","Inter.ttc"))
+        font_id = QFontDatabase.addApplicationFont(resource_path(os.path.join("assets","Inter.ttc")))
         if font_id != -1:
             self.font = QFontDatabase.applicationFontFamilies(font_id)[0]
         else:
@@ -1089,6 +1097,17 @@ class CollectionsLandingPage(QMainWindow):
 
 
 def main():
+    # made by gemini bc I had a bug when creating .exe
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # This code runs only when in a PyInstaller bundle.
+        # It redirects stdout and stderr to a log file.
+        log_dir = os.path.join(os.path.expanduser("~"), "PixieLogs")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        log_file = os.path.join(log_dir, "pixie_log.txt")
+        sys.stdout = open(log_file, 'a', encoding='utf-8')
+        sys.stderr = open(log_file, 'a', encoding='utf-8')
+        
     app = QApplication(sys.argv)
     
     # Set application style
