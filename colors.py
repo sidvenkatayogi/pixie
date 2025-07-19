@@ -1,7 +1,5 @@
-# TODO improve dominant colors
 from PIL import Image
 import numpy as np
-import os
 from skimage.color import rgb2lab
 import colorsys
 
@@ -153,9 +151,9 @@ def multidist(i1, i2, k = 4):
                 h1, s1, v1 = colorsys.rgb_to_hsv(rgbf1[0]/255, rgbf1[1]/255, rgbf1[2]/255)
                 h2, s2, v2 = colorsys.rgb_to_hsv(rgbf2[0]/255, rgbf2[1]/255, rgbf2[2]/255)
                 hd = (min(abs(h1 - h2), 1 - abs(h1 - h2))*2) # try distance in both directions bc hue is circular and convert between 0-1
-                hw = 300
+                hw = 300 # this seemed high at first but it gave me goood visual results
                 sw = (s1 + s2)/2 # saturation weight, more saturation means weigh hue more
-                v = (1 - abs((v1+v2)/2 - 0.1)/0.9) # value weight, low-medium value means weigh hue more
+                v = (1 - abs((v1+v2)/2 - 0.2)/0.8) # value weight, low-medium value means weigh hue and penalty more
                 p = hw * hd * sw * v # penalize different hue when it's saturated and low-medium value
                 
                 # normalize frequency by the frequency of the most dominant color

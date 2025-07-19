@@ -229,28 +229,19 @@ def search_clip(name, query : str, k = 5):
                 "path" (Any): the respective image path to the image embedding
                 "distance" (float): distance to the query
     """
-    start_time = time.time()
 
     index = faiss.read_index(os.path.join("collections", name, f"{name}_clip.index"))
-    end_time = time.time()
-    print(f"Loading index time: {end_time - start_time:.3f} seconds")
 
     if k == -1:
         k = index.ntotal
 
-    start_time = time.time()
     text_tokens = open_clip.tokenize(query).to(device)
 
     with torch.no_grad():
         query_embedding = clip_model.encode_text(text_tokens)
         query_embedding = query_embedding.cpu().numpy()
-    end_time = time.time()
-    print(f"Embedding query time: {end_time - start_time:.3f} seconds")
 
-    start_time = time.time()
     distances, indices = index.search(query_embedding, k)
-    end_time = time.time()
-    print(f"Search time: {end_time - start_time:.3f} seconds")
 
     indices = indices[0]
     distances = distances[0]

@@ -1,18 +1,16 @@
-import sys
 import os
 import json
 import numpy as np
 from PIL import Image
 import random
 import colorsys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QCheckBox, QMenu,
                              QGraphicsPixmapItem, QVBoxLayout, QHBoxLayout, QWidget, 
                              QPushButton, QSlider, QLabel, QLineEdit, QComboBox, QFileDialog, 
                              QFrame, QColorDialog, QButtonGroup, QRadioButton, QGroupBox, 
-                             QSpacerItem, QDialog, QSizePolicy, QProgressDialog, QMessageBox, 
-                             QCheckBox, QMenu)
+                             QSpacerItem, QDialog, QSizePolicy, QProgressDialog, QMessageBox)
 from PyQt5.QtGui import QPixmap, QImage, QColor, QPainter, QFont
-from PyQt5.QtCore import Qt, QPoint, QPointF, QRectF, QElapsedTimer, QTimer, pyqtSignal, QSize, QThread
+from PyQt5.QtCore import Qt, QRectF, QElapsedTimer, QTimer, pyqtSignal, QThread
 
 from view import CustomGraphicsView
 from vectorDB import VectorDB

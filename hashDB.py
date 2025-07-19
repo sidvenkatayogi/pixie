@@ -1,4 +1,4 @@
-"""I made this class for image hashing by color but I endeed up making my own way of comparing images by color
+"""I made this class for image hashing by color but I ended up making my own way of comparing images by color
 it uses the imagehash library and clusters images into a hash
 i don't really get how the clustering worked though so i didn't use it and just used a vector approach
 utilizing this in the future, maybe combiend with vectors, could be a significant performance improvement"""
@@ -34,13 +34,6 @@ class HashDB:
         return self.hash_data.get(id)
 
     def update_index(self, id, hash):
-        """
-        Update the index
-
-        Args:
-            id (str or int)
-            hash (imagehash.ImageHash)
-        """
         for id2, hash2 in self.hash_data.items():
             distance = (hash - hash2)
             self.hash_index[id2][id] = distance

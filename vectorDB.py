@@ -2,7 +2,6 @@ import numpy as np
 import colors
 import os
 import json
-import pickle
 from tqdm import tqdm
 
 class NumpyEncoder(json.JSONEncoder):

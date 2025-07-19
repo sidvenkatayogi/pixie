@@ -3,7 +3,6 @@ import os
 import shutil
 import re
 import json
-from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QPushButton, 
                              QFrame, QScrollArea, QDialog, QLineEdit, QMenu,
@@ -12,7 +11,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QPixmap, QFontDatabase, QFont, QPainter, QColor, QIcon
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QThread, QTimer
 from uuid import uuid4
+from datetime import datetime
 from pins import download_board
+
 
 class CollectionThumbnail(QFrame):
     clicked = pyqtSignal()
