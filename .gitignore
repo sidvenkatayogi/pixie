@@ -6,10 +6,11 @@
 *.gif
 *.m4v
 !assets/Pinterest-logo.png
+!assets/logo.png
+!assets/screenshot.jpeg
 build/
 dist/
 models/
-*.spec
 __pycache__/
 *.json
 *.index
