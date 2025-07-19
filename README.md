@@ -1,9 +1,9 @@
-# PIXIE --- PIcture eXploration and Inference Engine
-Pixie lets you view and explore your saved images by various indices. It's perfect for visual creatives looking for a novel, intuitive visual method to browse/search for inspiration and reference. [Demo]()
-
+# PIXIE: PIcture eXploration and Inference Engine
+![logo](https://github.com/sidvenkatayogi/pixie/blob/20ed0e6b62ee6d6cd428d4e9826f708d476d604b/assets/logo.png) Pixie lets you view and explore your saved images by various indices. It's perfect for visual creatives looking for a novel, intuitive visual method to browse/search for inspiration and reference. [Demo]()
+![screenshot](https://github.com/sidvenkatayogi/pixie/blob/20ed0e6b62ee6d6cd428d4e9826f708d476d604b/assets/screenshot.jpeg)
 ## Installation
 ### Released Version
-Currently, Pixie only supports Windows. You can download the app from the [latest release]().
+Currently, Pixie is only supported on Windows. You can download the app from the [latest release]().
 
 ### For Development
 To get the current development version:
@@ -15,7 +15,7 @@ To get the current development version:
 2. Create a virtual environment (recommended):
    ```bash
    python -m venv .venv
-   source .venv/Scripts/activate
+   .venv/Scripts/activate
    ```
 3. Install the required packages:
    ```bash
