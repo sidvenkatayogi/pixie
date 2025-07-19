@@ -2,16 +2,17 @@ from PIL import Image
 import numpy as np
 from tqdm import tqdm
 import os
-from imagehash import colorhash
-from vectorDB import VectorDB
-from hashDB import HashDB
-from colors import get_dominant_colors
 import faiss
 import json
 import time
 import torch
 import torchvision.transforms.v2 as tfms
 import open_clip
+from imagehash import colorhash
+from vectorDB import VectorDB
+from hashDB import HashDB
+from colors import get_dominant_colors
+
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" # quick fix for a faiss bug
 
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
@@ -146,8 +147,6 @@ def add_color(name, folder_path, explore= False, progress=None):
         db = VectorDB(name= name)
 
     for i, path in enumerate(tqdm(image_paths, desc= f"Creating Embeddings and Adding to DB...")):
-        if i == 150:
-            breakpoint()
         try:
             if type(db) == VectorDB:
                 if db.get_vector(path) == None:
