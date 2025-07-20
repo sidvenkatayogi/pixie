@@ -1,7 +1,5 @@
 # PIXIE: PIcture eXploration and Inference Engine
 <a href="url"><img src="https://github.com/sidvenkatayogi/pixie/blob/20ed0e6b62ee6d6cd428d4e9826f708d476d604b/assets/logo.png" align="left" height="128" width="128" ></a> Pixie lets you view and explore your saved images by various indices. It's perfect for visual creatives looking for a novel, intuitive visual method to browse/search for inspiration and reference.
-
-
 [Demo](https://youtu.be/1uvD84H6gYE)
 
 <a href="url"><img src="https://github.com/sidvenkatayogi/pixie/blob/20ed0e6b62ee6d6cd428d4e9826f708d476d604b/assets/screenshot.jpeg" align="center" height="300" width="auto" ></a>
