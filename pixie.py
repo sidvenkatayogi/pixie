@@ -1101,9 +1101,8 @@ def main():
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # This code runs only when in a PyInstaller bundle.
         # It redirects stdout and stderr to a log file.
-        log_dir = os.path.join(os.path.expanduser("~"), "PixieLogs")
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+        log_dir = "PixieLogs"
+        os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, "pixie_log.txt")
         sys.stdout = open(log_file, 'a', encoding='utf-8')
         sys.stderr = open(log_file, 'a', encoding='utf-8')

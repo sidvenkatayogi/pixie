@@ -17,13 +17,9 @@ from colors import get_dominant_colors
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" # quick fix for a faiss bug
 
-if hasattr(sys, '_MEIPASS'):
-    torch.hub.set_dir(os.path.join(sys._MEIPASS, 'models', 'torch_hub'))
-    openclip_cache = os.path.join(sys._MEIPASS, 'models', 'openclip')
-else:
-    os.makedirs("./models", exist_ok=True)
-    torch.hub.set_dir('./models/torch_hub')
-    openclip_cache = './models/openclip'
+os.makedirs("./models", exist_ok=True)
+torch.hub.set_dir('./models/torch_hub')
+openclip_cache = './models/openclip'
 
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vits16')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
