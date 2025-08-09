@@ -29,7 +29,7 @@ class ImageMosaicApp(QMainWindow):
         self.uuid = uuid
         self.collection_data = collection_data
         self.color_db = VectorDB.get_DB(self.uuid)
-        self.setWindowTitle(f"Mosaic View - {collection_data["name"]}")
+        self.setWindowTitle(f"Mosaic View - {collection_data['name']}")
         self.setGeometry(100, 100, 1400, 768)
 
         self.animation_timer = QTimer()
@@ -70,16 +70,16 @@ class ImageMosaicApp(QMainWindow):
         """Handle right-click context menu in scene"""
         # Get item under cursor
         item = self.scene.itemAt(event.scenePos(), self.view.transform())
-        if isinstance(item, QGraphicsPixmapItem) and self.image_data[item]["path"]:
+        if isinstance(item, QGraphicsPixmapItem) and self.image_data[item]['path']:
             # Find the image path for this item
             # for data_item, data in self.image_data.items():
             #     if data_item == item:
-                    path = self.image_data[item]["path"]
+                    path = self.image_data[item]['path']
                     preview = None
                     c = False
                     if isinstance(self.image_data[item].get("colors"), (list, np.ndarray)):
                         c = True
-                        colors = self.image_data[item]["colors"]
+                        colors = self.image_data[item]['colors']
                         image = show_palette(colors)
                         
                         # Create color palette preview dialog
@@ -103,7 +103,7 @@ class ImageMosaicApp(QMainWindow):
                     # Create context menu
                     menu = QMenu() 
                     query_visual = None
-                    if self.collection_data["dino"]:
+                    if self.collection_data['dino']:
                         query_visual = menu.addAction("Find Visually Similar")
                     query_color = menu.addAction("Find Colorfully Similar")
                     open_palette = None
@@ -288,11 +288,11 @@ class ImageMosaicApp(QMainWindow):
         layout.addWidget(image_count_label)
         self.image_count_slider = QSlider(Qt.Horizontal)
         self.image_count_slider.setMinimum(1)
-        self.image_count_slider.setMaximum(self.collection_data["image_count"])
-        self.image_count_slider.setValue(max(1, int(self.collection_data["image_count"] * 0.5)))
+        self.image_count_slider.setMaximum(self.collection_data['image_count'])
+        self.image_count_slider.setValue(max(1, int(self.collection_data['image_count'] * 0.5)))
         self.image_count_slider.valueChanged.connect(self.updateImageCountLabel)
         
-        self.image_count_label = QLabel(str(max(1, int(self.collection_data["image_count"] * 0.5))))
+        self.image_count_label = QLabel(str(max(1, int(self.collection_data['image_count'] * 0.5))))
         self.image_count_label.setFont(QFont(self.font, 11))
         self.image_count_label.setAlignment(Qt.AlignCenter)
         
@@ -348,19 +348,19 @@ class ImageMosaicApp(QMainWindow):
         self.create_index_widget = QWidget()
         create_index_layout = QVBoxLayout(self.create_index_widget)
         
-        if not self.collection_data["clip"]:
+        if not self.collection_data['clip']:
             self.create_clip_btn = QPushButton("Create CLIP Index")
             self.create_clip_btn.setFont(QFont(self.font, 11))
             self.create_clip_btn.clicked.connect(lambda: self.createIndex("clip"))
             search_layout.addWidget(self.create_clip_btn)
-        if not self.collection_data["dino"]:
+        if not self.collection_data['dino']:
             self.create_dino_btn = QPushButton("Create DINO Index")
             self.create_dino_btn.setFont(QFont(self.font, 11))
             self.create_dino_btn.clicked.connect(lambda: self.createIndex("dino"))
             create_index_layout.addWidget(self.create_dino_btn)
             search_layout.addWidget(self.create_index_widget)
         
-        if not (self.collection_data["clip"] and self.collection_data["dino"]):
+        if not (self.collection_data['clip'] and self.collection_data['dino']):
             # ADD THE SEARCH FRAME TO THE MAIN LAYOUT
             layout.addWidget(self.search_frame)
 
@@ -375,13 +375,13 @@ class ImageMosaicApp(QMainWindow):
         search_types = ["Color Search"]  # Color search always available
 
         # Add CLIP text search if supported
-        if self.collection_data.get("clip", False):
+        if self.collection_data.get('clip', False):
             search_types.append("Text Search (CLIP)")
             # just gonna let dino do image search
             # search_types.append("Image Content Search (CLIP)")
 
         # Add Visual Similarity if DINO supported  
-        if self.collection_data.get("dino", False):
+        if self.collection_data.get('dino', False):
             search_types.append("Image Similarity Search (DINO)")
 
         self.search_type_combo.addItems(search_types)
@@ -667,7 +667,7 @@ class ImageMosaicApp(QMainWindow):
                     self.error.emit(str(e))
         
         # show progress dialog
-        progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", None, 0, self.collection_data["image_count"], self)
+        progress_dialog = QProgressDialog(f"Creating {index_type.upper()} index...", None, 0, self.collection_data['image_count'], self)
         progress_dialog.setWindowTitle("Loading")
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setWindowFlag(Qt.WindowCloseButtonHint, False)
@@ -682,7 +682,7 @@ class ImageMosaicApp(QMainWindow):
         
         def on_progress_value(value):
             progress_dialog.setValue(value)
-            progress_dialog.setLabelText(f"Creating {index_type.upper()} index... ({value}/{self.collection_data["image_count"]})")
+            progress_dialog.setLabelText(f"Creating {index_type.upper()} index... ({value}/{self.collection_data['image_count']})")
 
         
         def on_finished():
@@ -715,7 +715,7 @@ class ImageMosaicApp(QMainWindow):
         # Clear and recreate search types
         search_types = ["Color Search"]  # Color search always available
         
-        if self.collection_data.get("clip", False):
+        if self.collection_data.get('clip', False):
             search_types.append("Text Search (CLIP)")
             # search_types.append("Image Content Search (CLIP)")
             
@@ -725,7 +725,7 @@ class ImageMosaicApp(QMainWindow):
                 self.create_clip_btn.deleteLater()
                 self.create_clip_btn = None
         
-        if self.collection_data.get("dino", False):
+        if self.collection_data.get('dino', False):
             search_types.append("Image Similarity Search (DINO)")
             
             # Remove DINO index creation button if it exists
@@ -735,7 +735,7 @@ class ImageMosaicApp(QMainWindow):
                 self.create_dino_btn = None
         
         # Hide or remove the search frame if both indices are created
-        if self.collection_data.get("clip", False) and self.collection_data.get("dino", False):
+        if self.collection_data.get('clip', False) and self.collection_data.get('dino', False):
             if hasattr(self, 'search_frame'):
                 self.search_frame.hide()  # or use .deleteLater() to remove it completely
         
@@ -1108,7 +1108,7 @@ class ImageMosaicApp(QMainWindow):
                 h = pixmap.height()
                 w = pixmap.width()
                 if w == 0 and h == 0:
-                    QMessageBox.critical(self, "Error", f"Images not found. Please recreate the collection or revert the names of any relevant folders.")
+                    QMessageBox.critical(self, "Error", 'Images not found. Please recreate the collection or revert the names of any relevant folders.')
                 ar = w/h
                 if max(h, w) == h:
                     pixmap = pixmap.scaled(int(self.STD_SIZE * ar), self.STD_SIZE,

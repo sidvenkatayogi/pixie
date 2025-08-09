@@ -1049,7 +1049,7 @@ class CollectionsLandingPage(QMainWindow):
         )
         def on_progress_value(value):
             progress_dialog.setValue(value)
-            progress_dialog.setLabelText(f"Creating color index... ({value}/{collection_data["image_count"]})")
+            progress_dialog.setLabelText(f"Creating color index... ({value}/{collection_data['image_count']})")
 
         def x():
             progress_dialog.close()
